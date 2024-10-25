@@ -97,7 +97,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         STREAMING,
         DISCARDING,
         FAILED,
-        SUCCEDED
+        SUCCEEDED
     }
 
     public ResultCursorImpl(
@@ -202,7 +202,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                             Collections.emptyMap(),
                             legacyNotifications,
                             null));
-                    case SUCCEDED -> CompletableFuture.completedStage(summary);
+                    case SUCCEEDED -> CompletableFuture.completedStage(summary);
                 };
         var future = new CompletableFuture<ResultSummary>();
         summaryFt.whenComplete((summary, throwable) -> {
@@ -284,7 +284,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                             null));
                 }
                 case FAILED -> stageExposingError(null);
-                case SUCCEDED -> CompletableFuture.completedStage(null);
+                case SUCCEEDED -> CompletableFuture.completedStage(null);
             };
         } else {
             return completedFuture(record);
@@ -357,7 +357,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                             null));
                 }
                 case FAILED -> stageExposingError(null);
-                case SUCCEDED -> CompletableFuture.completedStage(null);
+                case SUCCEEDED -> CompletableFuture.completedStage(null);
             };
         } else {
             return completedFuture(record);
@@ -483,7 +483,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                 case FAILED -> stageExposingError(null).thenApply(ignored -> {
                     throw new NoSuchRecordException("Cannot retrieve a single record, because this result is empty.");
                 });
-                case SUCCEDED -> records.size() == 1
+                case SUCCEEDED -> records.size() == 1
                         ? CompletableFuture.completedFuture(records.poll())
                         : CompletableFuture.failedStage(new NoSuchRecordException(
                                 "Cannot retrieve a single record, because this result is empty."));
@@ -513,7 +513,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                 });
             }
             case FAILED -> listAsync().thenApply(ignored -> null);
-            case SUCCEDED -> listAsync().thenApply(list -> {
+            case SUCCEEDED -> listAsync().thenApply(list -> {
                 list.forEach(action);
                 return summary;
             });
@@ -583,7 +583,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                         null));
             }
             case FAILED -> stageExposingError(null).thenApply(ignored -> Collections.emptyList());
-            case SUCCEDED -> {
+            case SUCCEEDED -> {
                 var records = this.records.stream().toList();
                 this.records.clear();
                 yield CompletableFuture.completedStage(records);
@@ -610,7 +610,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         }
         return switch (state) {
             case READY, STREAMING, DISCARDING -> CompletableFuture.completedStage(true);
-            case FAILED, SUCCEDED -> CompletableFuture.completedStage(false);
+            case FAILED, SUCCEEDED -> CompletableFuture.completedStage(false);
         };
     }
 
@@ -723,7 +723,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                             summary.metadata(),
                             legacyNotifications,
                             generateGqlStatusObject(runSummary.keys()));
-                    state = State.SUCCEDED;
+                    state = State.SUCCEEDED;
                 } catch (Throwable throwable) {
                     summaryError = throwable;
                 }
@@ -960,7 +960,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             DatabaseBookmark databaseBookmark = null;
             Throwable error = null;
             synchronized (this) {
-                state = State.SUCCEDED;
+                state = State.SUCCEEDED;
                 updateRecordState(RecordState.NO_RECORD);
                 try {
                     this.summary = METADATA_EXTRACTOR.extractSummary(
@@ -1361,7 +1361,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                     }
                 }
                 case FAILED -> stageExposingError(null).handle((ignored, throwable) -> throwable);
-                case SUCCEDED -> CompletableFuture.completedStage(null);
+                case SUCCEEDED -> CompletableFuture.completedStage(null);
             };
         }
     }

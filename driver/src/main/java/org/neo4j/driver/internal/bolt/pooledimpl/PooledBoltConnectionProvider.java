@@ -206,7 +206,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 empty.set(pooledConnectionEntries.isEmpty());
                 try {
                     // go over existing entries first
-                    connectionEntryWithMetadata = acquireExistingEntry(authMap, mode, impersonatedUser, minVersion);
+                    connectionEntryWithMetadata = acquireExistingEntry(authMap, minVersion);
                 } catch (MinVersionAcquisitionException e) {
                     acquisitionFuture.completeExceptionally(e);
                     return;
@@ -399,7 +399,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     private synchronized ConnectionEntryWithMetadata acquireExistingEntry(
-            Map<String, Value> authMap, AccessMode mode, String impersonatedUser, BoltProtocolVersion minVersion) {
+            Map<String, Value> authMap, BoltProtocolVersion minVersion) {
         ConnectionEntryWithMetadata connectionEntryWithMetadata = null;
         var iterator = pooledConnectionEntries.iterator();
         while (iterator.hasNext()) {

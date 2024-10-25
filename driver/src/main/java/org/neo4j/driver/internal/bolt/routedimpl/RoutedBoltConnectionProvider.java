@@ -264,8 +264,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             return CompletableFuture.failedFuture(error);
         }
         CompletableFuture<Boolean> result = CompletableFuture.completedFuture(null);
-        Throwable baseError = new ServiceUnavailableException(
-                "Failed to perform multi-databases feature detection with the following servers: " + addresses);
+        Throwable baseError = new ServiceUnavailableException(baseErrorMessagePrefix + addresses);
 
         for (var address : addresses) {
             result = FutureUtil.onErrorContinue(result, baseError, completionError -> {
