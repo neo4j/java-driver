@@ -238,7 +238,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                         } catch (Throwable throwable) {
                                             log.log(
                                                     System.Logger.Level.WARNING,
-                                                    "Unexpected error occured.",
+                                                    "Unexpected error occurred.",
                                                     throwable);
                                         }
                                     },
