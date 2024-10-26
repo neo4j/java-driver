@@ -17,7 +17,6 @@
 package org.neo4j.driver.internal.bolt.basicimpl.async.connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,11 +25,11 @@ import static org.neo4j.driver.internal.bolt.api.BoltServerAddress.LOCAL_DEFAULT
 import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.BoltProtocolUtil.handshakeBuf;
 import static org.neo4j.driver.testutil.TestUtil.await;
 
-import io.netty.channel.ChannelPromise;
+import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.util.concurrent.Future;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
@@ -46,8 +45,8 @@ class ChannelConnectedListenerTest {
 
     @Test
     void shouldFailPromiseWhenChannelConnectionFails() {
-        var handshakeCompletedPromise = channel.newPromise();
-        var listener = newListener(handshakeCompletedPromise);
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture);
 
         var channelConnectedPromise = channel.newPromise();
         var cause = new IOException("Unable to connect!");
@@ -55,14 +54,14 @@ class ChannelConnectedListenerTest {
 
         listener.operationComplete(channelConnectedPromise);
 
-        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedPromise));
+        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(cause, error.getCause());
     }
 
     @Test
     void shouldWriteHandshakeWhenChannelConnected() {
-        var handshakeCompletedPromise = channel.newPromise();
-        var listener = newListener(handshakeCompletedPromise);
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture);
 
         var channelConnectedPromise = channel.newPromise();
         channelConnectedPromise.setSuccess();
@@ -76,24 +75,20 @@ class ChannelConnectedListenerTest {
 
     @Test
     void shouldCompleteHandshakePromiseExceptionallyOnWriteFailure() {
-        var handshakeCompletedPromise = channel.newPromise();
-        var listener = newListener(handshakeCompletedPromise);
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture);
         var channelConnectedPromise = channel.newPromise();
         channelConnectedPromise.setSuccess();
         channel.close();
 
         listener.operationComplete(channelConnectedPromise);
 
-        assertTrue(handshakeCompletedPromise.isDone());
-        var future = new CompletableFuture<Future<?>>();
-        handshakeCompletedPromise.addListener(future::complete);
-        var handshakeFuture = future.join();
-        assertTrue(handshakeFuture.isDone());
-        assertFalse(handshakeFuture.isSuccess());
-        assertInstanceOf(ServiceUnavailableException.class, handshakeFuture.cause());
+        assertTrue(handshakeCompletedFuture.isCompletedExceptionally());
+        var exception = assertThrows(CompletionException.class, handshakeCompletedFuture::join);
+        assertInstanceOf(ServiceUnavailableException.class, exception.getCause());
     }
 
-    private static ChannelConnectedListener newListener(ChannelPromise handshakeCompletedPromise) {
+    private static ChannelConnectedListener newListener(CompletableFuture<Channel> handshakeCompletedPromise) {
         return new ChannelConnectedListener(
                 LOCAL_DEFAULT,
                 new ChannelPipelineBuilderImpl(),

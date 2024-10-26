@@ -21,7 +21,7 @@ import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelA
 import static org.neo4j.driver.internal.bolt.basicimpl.messaging.request.CommitMessage.COMMIT;
 import static org.neo4j.driver.internal.bolt.basicimpl.messaging.request.RollbackMessage.ROLLBACK;
 
-import io.netty.channel.ChannelPromise;
+import io.netty.channel.Channel;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -91,21 +91,19 @@ public class BoltProtocolV3 implements BoltProtocol {
     }
 
     @Override
-    public void initializeChannel(
+    public CompletionStage<Channel> initializeChannel(
+            Channel channel,
             String userAgent,
             BoltAgent boltAgent,
             Map<String, Value> authMap,
             RoutingContext routingContext,
-            ChannelPromise channelInitializedPromise,
             NotificationConfig notificationConfig,
             Clock clock,
             CompletableFuture<Long> latestAuthMillisFuture) {
         var exception = verifyNotificationConfigSupported(notificationConfig);
         if (exception != null) {
-            channelInitializedPromise.setFailure(exception);
-            return;
+            return CompletableFuture.failedStage(exception);
         }
-        var channel = channelInitializedPromise.channel();
         HelloMessage message;
 
         if (routingContext.isServerRoutingEnabled()) {
@@ -132,13 +130,7 @@ public class BoltProtocolV3 implements BoltProtocol {
         var handler = new HelloResponseHandler(future, channel, clock, latestAuthMillisFuture);
         messageDispatcher(channel).enqueue(handler);
         channel.writeAndFlush(message, channel.voidPromise());
-        future.whenComplete((serverAgent, throwable) -> {
-            if (throwable != null) {
-                channelInitializedPromise.setFailure(throwable);
-            } else {
-                channelInitializedPromise.setSuccess();
-            }
-        });
+        return future.thenApply(ignored -> channel);
     }
 
     @SuppressWarnings("DuplicatedCode")

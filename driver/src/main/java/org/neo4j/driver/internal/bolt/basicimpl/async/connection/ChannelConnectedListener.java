@@ -19,9 +19,10 @@ package org.neo4j.driver.internal.bolt.basicimpl.async.connection;
 import static java.lang.String.format;
 import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.BoltProtocolUtil.handshakeString;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelPromise;
+import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.driver.exceptions.SecurityException;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
@@ -32,30 +33,29 @@ import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 public class ChannelConnectedListener implements ChannelFutureListener {
     private final BoltServerAddress address;
     private final ChannelPipelineBuilder pipelineBuilder;
-    private final ChannelPromise handshakeCompletedPromise;
+    private final CompletableFuture<Channel> handshakeCompletedFuture;
     private final LoggingProvider logging;
 
     public ChannelConnectedListener(
             BoltServerAddress address,
             ChannelPipelineBuilder pipelineBuilder,
-            ChannelPromise handshakeCompletedPromise,
+            CompletableFuture<Channel> handshakeCompletedFuture,
             LoggingProvider logging) {
         this.address = address;
         this.pipelineBuilder = pipelineBuilder;
-        this.handshakeCompletedPromise = handshakeCompletedPromise;
+        this.handshakeCompletedFuture = handshakeCompletedFuture;
         this.logging = logging;
     }
 
     @Override
     public void operationComplete(ChannelFuture future) {
-        var channel = future.channel();
-        var log = new ChannelActivityLogger(channel, logging, getClass());
-
         if (future.isSuccess()) {
+            var channel = future.channel();
+            var log = new ChannelActivityLogger(channel, logging, getClass());
             log.log(System.Logger.Level.TRACE, "Channel %s connected, initiating bolt handshake", channel);
 
             var pipeline = channel.pipeline();
-            pipeline.addLast(new HandshakeHandler(pipelineBuilder, handshakeCompletedPromise, logging));
+            pipeline.addLast(new HandshakeHandler(pipelineBuilder, handshakeCompletedFuture, logging));
             log.log(System.Logger.Level.DEBUG, "C: [Bolt Handshake] %s", handshakeString());
             channel.writeAndFlush(BoltProtocolUtil.handshakeBuf()).addListener(f -> {
                 if (!f.isSuccess()) {
@@ -66,11 +66,11 @@ public class ChannelConnectedListener implements ChannelFutureListener {
                         error = new ServiceUnavailableException(
                                 String.format("Unable to write Bolt handshake to %s.", this.address), error);
                     }
-                    this.handshakeCompletedPromise.setFailure(error);
+                    this.handshakeCompletedFuture.completeExceptionally(error);
                 }
             });
         } else {
-            handshakeCompletedPromise.setFailure(databaseUnavailableError(address, future.cause()));
+            handshakeCompletedFuture.completeExceptionally(databaseUnavailableError(address, future.cause()));
         }
     }
 

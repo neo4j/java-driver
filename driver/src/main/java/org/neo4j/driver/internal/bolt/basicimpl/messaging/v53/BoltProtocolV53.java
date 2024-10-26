@@ -18,11 +18,12 @@ package org.neo4j.driver.internal.bolt.basicimpl.messaging.v53;
 
 import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelAttributes.messageDispatcher;
 
-import io.netty.channel.ChannelPromise;
+import io.netty.channel.Channel;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -41,21 +42,19 @@ public class BoltProtocolV53 extends BoltProtocolV52 {
 
     @SuppressWarnings("DuplicatedCode")
     @Override
-    public void initializeChannel(
+    public CompletionStage<Channel> initializeChannel(
+            Channel channel,
             String userAgent,
             BoltAgent boltAgent,
             Map<String, Value> authMap,
             RoutingContext routingContext,
-            ChannelPromise channelInitializedPromise,
             NotificationConfig notificationConfig,
             Clock clock,
             CompletableFuture<Long> latestAuthMillisFuture) {
         var exception = verifyNotificationConfigSupported(notificationConfig);
         if (exception != null) {
-            channelInitializedPromise.setFailure(exception);
-            return;
+            return CompletableFuture.failedStage(exception);
         }
-        var channel = channelInitializedPromise.channel();
         HelloMessage message;
 
         if (routingContext.isServerRoutingEnabled()) {
@@ -88,13 +87,7 @@ public class BoltProtocolV53 extends BoltProtocolV52 {
                 .enqueue(new LogonResponseHandler(logonFuture, channel, clock, latestAuthMillisFuture));
         channel.writeAndFlush(logon, channel.voidPromise());
 
-        helloFuture.thenCompose(ignored -> logonFuture).whenComplete((ignored, throwable) -> {
-            if (throwable != null) {
-                channelInitializedPromise.setFailure(throwable);
-            } else {
-                channelInitializedPromise.setSuccess();
-            }
-        });
+        return helloFuture.thenCompose(ignored -> logonFuture).thenApply(ignored -> channel);
     }
 
     @Override
