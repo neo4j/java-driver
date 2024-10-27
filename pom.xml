@@ -56,7 +56,7 @@
     <logback-classic.version>1.2.13</logback-classic.version>
     <jackson.version>2.17.2</jackson.version>
     <lombok.version>1.18.34</lombok.version>
-    <svm.version>24.0.2</svm.version>
+    <svm.version>24.1.0</svm.version>
     <micrometer.version>1.13.2</micrometer.version>
     <blockhound.version>1.0.9.RELEASE</blockhound.version>
     <testcontainers.version>1.20.0</testcontainers.version>
