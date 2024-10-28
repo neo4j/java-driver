@@ -48,6 +48,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -175,22 +176,29 @@ abstract class AbstractStressTestBase<C extends AbstractContext> {
         context.stop();
 
         Throwable firstError = null;
+        var totalDuration = 0L;
         var maxDuration = 0L;
+        var number = 0;
         var clock = Clock.systemUTC();
         for (var future : resultFutures) {
+            var time = clock.millis();
+            number++;
             try {
-                var time = clock.millis();
                 assertNull(future.get(300, SECONDS));
+            } catch (Throwable error) {
+                firstError = withSuppressed(firstError, error);
+            } finally {
                 var duration = clock.millis() - time;
+                totalDuration += duration;
                 if (duration > maxDuration) {
                     maxDuration = duration;
                 }
-            } catch (Throwable error) {
-                firstError = withSuppressed(firstError, error);
             }
         }
 
-        System.out.printf("MAX DURATION %s %d millis%n", getClass().getCanonicalName(), maxDuration);
+        System.out.printf(
+                "MAX DURATION %s %d millis AVG DURATION %d millis%n",
+                getClass().getCanonicalName(), maxDuration, totalDuration / number);
 
         printStats(context);
 
@@ -265,7 +273,10 @@ abstract class AbstractStressTestBase<C extends AbstractContext> {
         return executor.submit(() -> {
             while (context.isNotStopped()) {
                 var command = randomOf(commands);
+                var uuid = UUID.randomUUID();
+                System.out.println("command " + uuid + " " + command.getClass().getCanonicalName() + " started");
                 command.execute(context);
+                System.out.println("command " + uuid + " " + command.getClass().getCanonicalName() + " stopped");
             }
             return null;
         });
