@@ -17,20 +17,25 @@
 package org.neo4j.driver.internal.bolt.basicimpl.async.connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.neo4j.driver.internal.bolt.api.BoltServerAddress.LOCAL_DEFAULT;
 import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.BoltProtocolUtil.handshakeBuf;
 import static org.neo4j.driver.testutil.TestUtil.await;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
@@ -46,8 +51,8 @@ class ChannelConnectedListenerTest {
 
     @Test
     void shouldFailPromiseWhenChannelConnectionFails() {
-        var handshakeCompletedPromise = channel.newPromise();
-        var listener = newListener(handshakeCompletedPromise);
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture);
 
         var channelConnectedPromise = channel.newPromise();
         var cause = new IOException("Unable to connect!");
@@ -55,14 +60,14 @@ class ChannelConnectedListenerTest {
 
         listener.operationComplete(channelConnectedPromise);
 
-        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedPromise));
+        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(cause, error.getCause());
     }
 
     @Test
     void shouldWriteHandshakeWhenChannelConnected() {
-        var handshakeCompletedPromise = channel.newPromise();
-        var listener = newListener(handshakeCompletedPromise);
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture);
 
         var channelConnectedPromise = channel.newPromise();
         channelConnectedPromise.setSuccess();
@@ -76,28 +81,199 @@ class ChannelConnectedListenerTest {
 
     @Test
     void shouldCompleteHandshakePromiseExceptionallyOnWriteFailure() {
-        var handshakeCompletedPromise = channel.newPromise();
-        var listener = newListener(handshakeCompletedPromise);
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture);
         var channelConnectedPromise = channel.newPromise();
         channelConnectedPromise.setSuccess();
         channel.close();
 
         listener.operationComplete(channelConnectedPromise);
 
-        assertTrue(handshakeCompletedPromise.isDone());
-        var future = new CompletableFuture<Future<?>>();
-        handshakeCompletedPromise.addListener(future::complete);
-        var handshakeFuture = future.join();
-        assertTrue(handshakeFuture.isDone());
-        assertFalse(handshakeFuture.isSuccess());
-        assertInstanceOf(ServiceUnavailableException.class, handshakeFuture.cause());
+        assertTrue(handshakeCompletedFuture.isCompletedExceptionally());
+        var exception = assertThrows(CompletionException.class, handshakeCompletedFuture::join);
+        assertInstanceOf(ServiceUnavailableException.class, exception.getCause());
     }
 
-    private static ChannelConnectedListener newListener(ChannelPromise handshakeCompletedPromise) {
+    @Test
+    void shouldCompleteFutureExceptionallyOnFailedPromise() {
+        var future = new CompletableFuture<Channel>();
+        var listener = newListener(future);
+        var throwable = mock(Throwable.class);
+
+        listener.operationComplete(new FailedPromise(throwable));
+
+        assertTrue(future.isCompletedExceptionally());
+        Throwable exception = assertThrows(CompletionException.class, future::join);
+        assertInstanceOf(ServiceUnavailableException.class, exception.getCause());
+        exception = exception.getCause();
+        assertEquals(throwable, exception.getCause());
+    }
+
+    private static ChannelConnectedListener newListener(CompletableFuture<Channel> handshakeCompletedFuture) {
         return new ChannelConnectedListener(
                 LOCAL_DEFAULT,
                 new ChannelPipelineBuilderImpl(),
-                handshakeCompletedPromise,
+                handshakeCompletedFuture,
                 NoopLoggingProvider.INSTANCE);
+    }
+
+    private record FailedPromise(Throwable failure) implements ChannelPromise {
+        @Override
+        public Channel channel() {
+            return null;
+        }
+
+        @Override
+        public ChannelPromise setSuccess(Void result) {
+            return null;
+        }
+
+        @Override
+        public boolean trySuccess(Void result) {
+            return false;
+        }
+
+        @Override
+        public ChannelPromise setSuccess() {
+            return null;
+        }
+
+        @Override
+        public boolean trySuccess() {
+            return false;
+        }
+
+        @Override
+        public ChannelPromise setFailure(Throwable cause) {
+            return null;
+        }
+
+        @Override
+        public boolean tryFailure(Throwable cause) {
+            return false;
+        }
+
+        @Override
+        public boolean setUncancellable() {
+            return false;
+        }
+
+        @Override
+        public boolean isSuccess() {
+            return false;
+        }
+
+        @Override
+        public boolean isCancellable() {
+            return false;
+        }
+
+        @Override
+        public Throwable cause() {
+            return failure;
+        }
+
+        @Override
+        public ChannelPromise addListener(GenericFutureListener<? extends Future<? super Void>> listener) {
+            return null;
+        }
+
+        @Override
+        @SafeVarargs
+        public final ChannelPromise addListeners(GenericFutureListener<? extends Future<? super Void>>... listeners) {
+            return null;
+        }
+
+        @Override
+        public ChannelPromise removeListener(GenericFutureListener<? extends Future<? super Void>> listener) {
+            return null;
+        }
+
+        @Override
+        @SafeVarargs
+        public final ChannelPromise removeListeners(
+                GenericFutureListener<? extends Future<? super Void>>... listeners) {
+            return null;
+        }
+
+        @Override
+        public ChannelPromise sync() {
+            return null;
+        }
+
+        @Override
+        public ChannelPromise syncUninterruptibly() {
+            return null;
+        }
+
+        @Override
+        public ChannelPromise await() {
+            return null;
+        }
+
+        @Override
+        public ChannelPromise awaitUninterruptibly() {
+            return null;
+        }
+
+        @Override
+        public boolean await(long timeout, TimeUnit unit) {
+            return false;
+        }
+
+        @Override
+        public boolean await(long timeoutMillis) {
+            return false;
+        }
+
+        @Override
+        public boolean awaitUninterruptibly(long timeout, TimeUnit unit) {
+            return false;
+        }
+
+        @Override
+        public boolean awaitUninterruptibly(long timeoutMillis) {
+            return false;
+        }
+
+        @Override
+        public Void getNow() {
+            return null;
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return false;
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return false;
+        }
+
+        @Override
+        public boolean isDone() {
+            return false;
+        }
+
+        @Override
+        public Void get() {
+            return null;
+        }
+
+        @Override
+        public Void get(long timeout, @NotNull TimeUnit unit) {
+            return null;
+        }
+
+        @Override
+        public boolean isVoid() {
+            return false;
+        }
+
+        @Override
+        public ChannelPromise unvoid() {
+            return null;
+        }
     }
 }

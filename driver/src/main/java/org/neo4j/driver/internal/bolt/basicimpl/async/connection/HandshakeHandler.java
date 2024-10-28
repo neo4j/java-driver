@@ -19,11 +19,12 @@ package org.neo4j.driver.internal.bolt.basicimpl.async.connection;
 import static org.neo4j.driver.internal.bolt.api.BoltProtocolVersion.isHttp;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.ReplayingDecoder;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.exceptions.SecurityException;
@@ -39,7 +40,7 @@ import org.neo4j.driver.internal.util.ErrorUtil;
 
 public class HandshakeHandler extends ReplayingDecoder<Void> {
     private final ChannelPipelineBuilder pipelineBuilder;
-    private final ChannelPromise handshakeCompletedPromise;
+    private final CompletableFuture<Channel> handshakeCompletedFuture;
     private final LoggingProvider logging;
 
     private boolean failed;
@@ -47,9 +48,11 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private ChannelErrorLogger errorLog;
 
     public HandshakeHandler(
-            ChannelPipelineBuilder pipelineBuilder, ChannelPromise handshakeCompletedPromise, LoggingProvider logging) {
+            ChannelPipelineBuilder pipelineBuilder,
+            CompletableFuture<Channel> handshakeCompletedFuture,
+            LoggingProvider logging) {
         this.pipelineBuilder = pipelineBuilder;
-        this.handshakeCompletedPromise = handshakeCompletedPromise;
+        this.handshakeCompletedFuture = handshakeCompletedFuture;
         this.logging = logging;
     }
 
@@ -114,7 +117,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private void protocolSelected(BoltProtocolVersion version, MessageFormat messageFormat, ChannelHandlerContext ctx) {
         ChannelAttributes.setProtocolVersion(ctx.channel(), version);
         pipelineBuilder.build(messageFormat, ctx.pipeline(), logging);
-        handshakeCompletedPromise.setSuccess();
+        handshakeCompletedFuture.complete(ctx.channel());
     }
 
     private void handleUnknownSuggestedProtocolVersion(BoltProtocolVersion version, ChannelHandlerContext ctx) {
@@ -128,7 +131,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     }
 
     private void fail(ChannelHandlerContext ctx, Throwable error) {
-        ctx.close().addListener(future -> handshakeCompletedPromise.tryFailure(error));
+        ctx.close().addListener(future -> handshakeCompletedFuture.completeExceptionally(error));
     }
 
     private static Throwable protocolNoSupportedByServerError() {

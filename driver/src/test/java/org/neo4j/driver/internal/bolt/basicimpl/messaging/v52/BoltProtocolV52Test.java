@@ -118,28 +118,28 @@ public class BoltProtocolV52Test {
 
     @Test
     void shouldInitializeChannel() {
-        var promise = channel.newPromise();
         var clock = mock(Clock.class);
         var time = 1L;
         when(clock.millis()).thenReturn(time);
 
         var latestAuthMillisFuture = new CompletableFuture<Long>();
 
-        protocol.initializeChannel(
-                "MyDriver/0.0.1",
-                null,
-                Collections.emptyMap(),
-                RoutingContext.EMPTY,
-                promise,
-                null,
-                clock,
-                latestAuthMillisFuture);
+        var future = protocol.initializeChannel(
+                        channel,
+                        "MyDriver/0.0.1",
+                        null,
+                        Collections.emptyMap(),
+                        RoutingContext.EMPTY,
+                        null,
+                        clock,
+                        latestAuthMillisFuture)
+                .toCompletableFuture();
 
         assertThat(channel.outboundMessages(), hasSize(2));
         assertThat(channel.outboundMessages().poll(), instanceOf(HelloMessage.class));
         assertThat(channel.outboundMessages().poll(), instanceOf(LogonMessage.class));
         assertEquals(2, messageDispatcher.queuedHandlersCount());
-        assertFalse(promise.isDone());
+        assertFalse(future.isDone());
 
         var metadata = Map.of(
                 "server", value("Neo4j/3.5.0"),
@@ -148,8 +148,8 @@ public class BoltProtocolV52Test {
         messageDispatcher.handleSuccessMessage(metadata);
         messageDispatcher.handleSuccessMessage(Collections.emptyMap());
 
-        assertTrue(promise.isDone());
-        assertTrue(promise.isSuccess());
+        assertTrue(future.isDone());
+        assertEquals(channel, future.join());
         verify(clock).millis();
         assertTrue(latestAuthMillisFuture.isDone());
         assertEquals(time, latestAuthMillisFuture.join());

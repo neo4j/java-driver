@@ -47,6 +47,7 @@ import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v4.BoltProtocolV4;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v51.BoltProtocolV51;
+import org.neo4j.driver.internal.bolt.basicimpl.util.FutureUtil;
 
 public final class NettyBoltConnectionProvider implements BoltConnectionProvider {
     private final LoggingProvider logging;
@@ -149,6 +150,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                 })
                 .handle((connection, throwable) -> {
                     if (throwable != null) {
+                        throwable = FutureUtil.completionExceptionCause(throwable);
                         log.log(System.Logger.Level.DEBUG, "Failed to establish BoltConnection " + address, throwable);
                         throw new CompletionException(throwable);
                     } else {

@@ -19,10 +19,9 @@ package org.neo4j.driver.internal.bolt.basicimpl;
 import static java.util.Objects.requireNonNull;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
@@ -47,10 +46,10 @@ import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.basicimpl.async.NetworkConnection;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelConnectedListener;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelPipelineBuilderImpl;
-import org.neo4j.driver.internal.bolt.basicimpl.async.connection.HandshakeCompletedListener;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.NettyChannelInitializer;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.NettyDomainNameResolverGroup;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.ConnectTimeoutHandler;
+import org.neo4j.driver.internal.bolt.basicimpl.messaging.BoltProtocol;
 import org.neo4j.driver.internal.bolt.basicimpl.spi.Connection;
 
 public final class NettyConnectionProvider implements ConnectionProvider {
@@ -69,7 +68,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             LocalAddress localAddress,
             LoggingProvider logging) {
         this.eventLoopGroup = eventLoopGroup;
-        this.clock = clock;
+        this.clock = requireNonNull(clock);
         this.domainNameResolver = requireNonNull(domainNameResolver);
         this.addressResolverGroup = new NettyDomainNameResolverGroup(this.domainNameResolver);
         this.localAddress = localAddress;
@@ -111,42 +110,22 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             socketAddress = localAddress;
         }
 
-        var connectedFuture = bootstrap.connect(socketAddress);
-
-        var channel = connectedFuture.channel();
-        var handshakeCompleted = channel.newPromise();
-        var connectionInitialized = channel.newPromise();
-
-        installChannelConnectedListeners(address, connectedFuture, handshakeCompleted, connectTimeoutMillis);
-        installHandshakeCompletedListeners(
-                handshakeCompleted,
-                connectionInitialized,
-                address,
-                routingContext,
-                authMap,
-                boltAgent,
-                userAgent,
-                latestAuthMillisFuture,
-                notificationConfig);
-
-        var future = new CompletableFuture<Connection>();
-        connectionInitialized.addListener((ChannelFutureListener) f -> {
-            var throwable = f.cause();
-            if (throwable != null) {
-                future.completeExceptionally(throwable);
-            } else {
-                var connection = new NetworkConnection(channel, logging);
-                future.complete(connection);
-            }
-        });
-        return future;
+        return installChannelConnectedListeners(address, bootstrap.connect(socketAddress), connectTimeoutMillis)
+                .thenCompose(channel -> BoltProtocol.forChannel(channel)
+                        .initializeChannel(
+                                channel,
+                                requireNonNull(userAgent),
+                                requireNonNull(boltAgent),
+                                authMap,
+                                routingContext,
+                                notificationConfig,
+                                clock,
+                                latestAuthMillisFuture))
+                .thenApply(channel -> new NetworkConnection(channel, logging));
     }
 
-    private void installChannelConnectedListeners(
-            BoltServerAddress address,
-            ChannelFuture channelConnected,
-            ChannelPromise handshakeCompleted,
-            int connectTimeoutMillis) {
+    private CompletionStage<Channel> installChannelConnectedListeners(
+            BoltServerAddress address, ChannelFuture channelConnected, int connectTimeoutMillis) {
         var pipeline = channelConnected.channel().pipeline();
 
         // add timeout handler to the pipeline when channel is connected. it's needed to
@@ -156,42 +135,16 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         channelConnected.addListener(future -> pipeline.addFirst(new ConnectTimeoutHandler(connectTimeoutMillis)));
 
         // add listener that sends Bolt handshake bytes when channel is connected
+        var handshakeCompleted = new CompletableFuture<Channel>();
         channelConnected.addListener(
                 new ChannelConnectedListener(address, new ChannelPipelineBuilderImpl(), handshakeCompleted, logging));
-    }
-
-    private void installHandshakeCompletedListeners(
-            ChannelPromise handshakeCompleted,
-            ChannelPromise connectionInitialized,
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            Map<String, Value> authMap,
-            BoltAgent boltAgent,
-            String userAgent,
-            CompletableFuture<Long> latestAuthMillisFuture,
-            NotificationConfig notificationConfig) {
-        var pipeline = handshakeCompleted.channel().pipeline();
-
-        // remove timeout handler from the pipeline once TLS and Bolt handshakes are
-        // completed. regular protocol
-        // messages will flow next and we do not want to have read timeout for them
-        handshakeCompleted.addListener(future -> {
-            if (future.isSuccess()) {
-                pipeline.remove(ConnectTimeoutHandler.class);
+        return handshakeCompleted.whenComplete((channel, throwable) -> {
+            if (throwable == null) {
+                // remove timeout handler from the pipeline once TLS and Bolt handshakes are
+                // completed. regular protocol
+                // messages will flow next and we do not want to have read timeout for them
+                channel.pipeline().remove(ConnectTimeoutHandler.class);
             }
         });
-
-        // add listener that sends an INIT message. connection is now fully established.
-        // channel pipeline is fully
-        // set to send/receive messages for a selected protocol version
-        handshakeCompleted.addListener(new HandshakeCompletedListener(
-                authMap,
-                userAgent,
-                boltAgent,
-                routingContext,
-                connectionInitialized,
-                notificationConfig,
-                this.clock,
-                latestAuthMillisFuture));
     }
 }

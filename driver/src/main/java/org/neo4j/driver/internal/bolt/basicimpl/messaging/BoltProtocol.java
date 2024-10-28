@@ -19,7 +19,6 @@ package org.neo4j.driver.internal.bolt.basicimpl.messaging;
 import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelAttributes.protocolVersion;
 
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelPromise;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
@@ -59,12 +58,12 @@ import org.neo4j.driver.internal.bolt.basicimpl.spi.Connection;
 public interface BoltProtocol {
     MessageFormat createMessageFormat();
 
-    void initializeChannel(
+    CompletionStage<Channel> initializeChannel(
+            Channel channel,
             String userAgent,
             BoltAgent boltAgent,
             Map<String, Value> authMap,
             RoutingContext routingContext,
-            ChannelPromise channelInitializedPromise,
             NotificationConfig notificationConfig,
             Clock clock,
             CompletableFuture<Long> latestAuthMillisFuture);

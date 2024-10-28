@@ -115,27 +115,27 @@ public final class BoltProtocolV43Test {
 
     @Test
     void shouldInitializeChannel() {
-        var promise = channel.newPromise();
         var clock = mock(Clock.class);
         var time = 1L;
         when(clock.millis()).thenReturn(time);
 
         var latestAuthMillisFuture = new CompletableFuture<Long>();
 
-        protocol.initializeChannel(
-                "MyDriver/0.0.1",
-                null,
-                Collections.emptyMap(),
-                RoutingContext.EMPTY,
-                promise,
-                null,
-                clock,
-                latestAuthMillisFuture);
+        var future = protocol.initializeChannel(
+                        channel,
+                        "MyDriver/0.0.1",
+                        null,
+                        Collections.emptyMap(),
+                        RoutingContext.EMPTY,
+                        null,
+                        clock,
+                        latestAuthMillisFuture)
+                .toCompletableFuture();
 
         assertThat(channel.outboundMessages(), hasSize(1));
         assertThat(channel.outboundMessages().poll(), instanceOf(HelloMessage.class));
         assertEquals(1, messageDispatcher.queuedHandlersCount());
-        assertFalse(promise.isDone());
+        assertFalse(future.isDone());
 
         var metadata = Map.of(
                 "server", value("Neo4j/3.5.0"),
@@ -143,8 +143,8 @@ public final class BoltProtocolV43Test {
 
         messageDispatcher.handleSuccessMessage(metadata);
 
-        assertTrue(promise.isDone());
-        assertTrue(promise.isSuccess());
+        assertTrue(future.isDone());
+        assertEquals(channel, future.join());
         verify(clock).millis();
         assertTrue(latestAuthMillisFuture.isDone());
         assertEquals(time, latestAuthMillisFuture.join());
@@ -152,28 +152,27 @@ public final class BoltProtocolV43Test {
 
     @Test
     void shouldFailToInitializeChannelWhenErrorIsReceived() {
-        var promise = channel.newPromise();
-
-        protocol.initializeChannel(
-                "MyDriver/2.2.1",
-                null,
-                Collections.emptyMap(),
-                RoutingContext.EMPTY,
-                promise,
-                null,
-                mock(Clock.class),
-                new CompletableFuture<>());
+        var future = protocol.initializeChannel(
+                        channel,
+                        "MyDriver/2.2.1",
+                        null,
+                        Collections.emptyMap(),
+                        RoutingContext.EMPTY,
+                        null,
+                        mock(Clock.class),
+                        new CompletableFuture<>())
+                .toCompletableFuture();
 
         assertThat(channel.outboundMessages(), hasSize(1));
         assertThat(channel.outboundMessages().poll(), instanceOf(HelloMessage.class));
         assertEquals(1, messageDispatcher.queuedHandlersCount());
-        assertFalse(promise.isDone());
+        assertFalse(future.isDone());
 
         messageDispatcher.handleFailureMessage(
                 new GqlError("Neo.TransientError.General.DatabaseUnavailable", "Error!"));
 
-        assertTrue(promise.isDone());
-        assertFalse(promise.isSuccess());
+        assertTrue(future.isDone());
+        assertTrue(future.isCompletedExceptionally());
     }
 
     @Test
