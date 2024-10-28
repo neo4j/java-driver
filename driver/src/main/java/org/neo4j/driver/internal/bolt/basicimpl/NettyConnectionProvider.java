@@ -139,7 +139,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         channelConnected.addListener(
                 new ChannelConnectedListener(address, new ChannelPipelineBuilderImpl(), handshakeCompleted, logging));
         return handshakeCompleted.whenComplete((channel, throwable) -> {
-            if (throwable != null) {
+            if (throwable == null) {
                 // remove timeout handler from the pipeline once TLS and Bolt handshakes are
                 // completed. regular protocol
                 // messages will flow next and we do not want to have read timeout for them
