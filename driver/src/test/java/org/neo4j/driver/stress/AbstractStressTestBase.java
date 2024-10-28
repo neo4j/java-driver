@@ -35,6 +35,7 @@ import static org.neo4j.driver.Values.point;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Array;
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -174,13 +175,22 @@ abstract class AbstractStressTestBase<C extends AbstractContext> {
         context.stop();
 
         Throwable firstError = null;
+        var maxDuration = 0L;
+        var clock = Clock.systemUTC();
         for (var future : resultFutures) {
             try {
+                var time = clock.millis();
                 assertNull(future.get(300, SECONDS));
+                var duration = clock.millis() - time;
+                if (duration > maxDuration) {
+                    maxDuration = duration;
+                }
             } catch (Throwable error) {
                 firstError = withSuppressed(firstError, error);
             }
         }
+
+        System.out.printf("MAX DURATION %s %d millis%n", getClass().getCanonicalName(), maxDuration);
 
         printStats(context);
 
