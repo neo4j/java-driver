@@ -68,7 +68,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             LocalAddress localAddress,
             LoggingProvider logging) {
         this.eventLoopGroup = eventLoopGroup;
-        this.clock = clock;
+        this.clock = requireNonNull(clock);
         this.domainNameResolver = requireNonNull(domainNameResolver);
         this.addressResolverGroup = new NettyDomainNameResolverGroup(this.domainNameResolver);
         this.localAddress = localAddress;
@@ -111,18 +111,11 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         }
 
         return installChannelConnectedListeners(address, bootstrap.connect(socketAddress), connectTimeoutMillis)
-                .thenApply(channel -> {
-                    // remove timeout handler from the pipeline once TLS and Bolt handshakes are
-                    // completed. regular protocol
-                    // messages will flow next and we do not want to have read timeout for them
-                    channel.pipeline().remove(ConnectTimeoutHandler.class);
-                    return channel;
-                })
                 .thenCompose(channel -> BoltProtocol.forChannel(channel)
                         .initializeChannel(
                                 channel,
-                                userAgent,
-                                boltAgent,
+                                requireNonNull(userAgent),
+                                requireNonNull(boltAgent),
                                 authMap,
                                 routingContext,
                                 notificationConfig,
@@ -145,6 +138,13 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         var handshakeCompleted = new CompletableFuture<Channel>();
         channelConnected.addListener(
                 new ChannelConnectedListener(address, new ChannelPipelineBuilderImpl(), handshakeCompleted, logging));
-        return handshakeCompleted;
+        return handshakeCompleted.whenComplete((channel, throwable) -> {
+            if (throwable != null) {
+                // remove timeout handler from the pipeline once TLS and Bolt handshakes are
+                // completed. regular protocol
+                // messages will flow next and we do not want to have read timeout for them
+                channel.pipeline().remove(ConnectTimeoutHandler.class);
+            }
+        });
     }
 }
