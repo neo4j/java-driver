@@ -269,9 +269,17 @@ public class PooledBoltConnection implements BoltConnection {
 
     @Override
     public CompletionStage<Void> close() {
-        if (closeFuture == null) {
-            closeFuture = new CompletableFuture<>();
+        CompletableFuture<Void> closeFuture;
+        var close = false;
+        synchronized (this) {
+            if (this.closeFuture == null) {
+                this.closeFuture = new CompletableFuture<>();
+                close = true;
+            }
+            closeFuture = this.closeFuture;
+        }
 
+        if (close) {
             if (delegate.state() == BoltConnectionState.CLOSED) {
                 purgeRunnable.run();
                 closeFuture.complete(null);
