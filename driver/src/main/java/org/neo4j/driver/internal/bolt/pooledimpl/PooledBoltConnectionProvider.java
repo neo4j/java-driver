@@ -36,7 +36,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.TransientException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BasicResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
@@ -53,6 +52,7 @@ import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
+import org.neo4j.driver.internal.bolt.api.exception.TransientException;
 import org.neo4j.driver.internal.bolt.pooledimpl.util.FutureUtil;
 
 public class PooledBoltConnectionProvider implements BoltConnectionProvider {

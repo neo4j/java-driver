@@ -16,9 +16,9 @@
  */
 package org.neo4j.driver.internal.bolt.basicimpl.messaging.v52;
 
-import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
+import org.neo4j.driver.internal.bolt.api.exception.BoltException;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.BoltProtocol;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v51.BoltProtocolV51;
 
@@ -27,7 +27,7 @@ public class BoltProtocolV52 extends BoltProtocolV51 {
     public static final BoltProtocol INSTANCE = new BoltProtocolV52();
 
     @Override
-    protected Neo4jException verifyNotificationConfigSupported(NotificationConfig notificationConfig) {
+    protected BoltException verifyNotificationConfigSupported(NotificationConfig notificationConfig) {
         return null;
     }
 

@@ -54,20 +54,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
-import org.neo4j.driver.exceptions.AuthTokenManagerExecutionException;
-import org.neo4j.driver.exceptions.AuthenticationException;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.SessionExpiredException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
+import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -76,9 +72,17 @@ import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.ClusterComposition;
 import org.neo4j.driver.internal.bolt.api.DefaultDomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
+import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.exception.AuthorizationExpiredException;
+import org.neo4j.driver.internal.bolt.api.exception.ClientException;
+import org.neo4j.driver.internal.bolt.api.exception.SecurityException;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.SessionExpiredException;
+import org.neo4j.driver.internal.bolt.api.exception.UnsupportedFeatureException;
+import org.neo4j.driver.internal.bolt.basicimpl.spi.Connection;
 import org.neo4j.driver.internal.util.FakeClock;
 import org.neo4j.driver.internal.util.ImmediateSchedulingEventExecutor;
 
@@ -143,7 +147,13 @@ class RediscoveryTest {
 
     @Test
     void shouldFailImmediatelyOnAuthError() {
-        var authError = new AuthenticationException("Neo.ClientError.Security.Unauthorized", "Wrong password");
+        var authError = new SecurityException(
+                GqlStatusError.UNKNOWN.getStatus(),
+                GqlStatusError.UNKNOWN.getStatusDescription("Wrong password"),
+                "Neo.ClientError.Security.Unauthorized",
+                "Wrong password",
+                GqlStatusError.DIAGNOSTIC_RECORD,
+                null);
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure
@@ -154,7 +164,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var error = assertThrows(
-                AuthenticationException.class,
+                ClientException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,
@@ -174,7 +184,14 @@ class RediscoveryTest {
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(
-                A, new AuthorizationExpiredException("Neo.ClientError.Security.AuthorizationExpired", "message"));
+                A,
+                new AuthorizationExpiredException(
+                        GqlStatusError.UNKNOWN.getStatus(),
+                        GqlStatusError.UNKNOWN.getStatusDescription("message"),
+                        "Neo.ClientError.Security.AuthorizationExpired",
+                        "message",
+                        GqlStatusError.DIAGNOSTIC_RECORD,
+                        null));
         responsesByAddress.put(B, expectedComposition);
 
         var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
@@ -204,7 +221,13 @@ class RediscoveryTest {
                 "Neo.ClientError.Transaction.InvalidBookmarkMixture"
             })
     void shouldFailImmediatelyOnBookmarkErrors(String code) {
-        var error = new ClientException(code, "Invalid");
+        var error = new ClientException(
+                GqlStatusError.UNKNOWN.getStatus(),
+                GqlStatusError.UNKNOWN.getStatusDescription("Invalid"),
+                code,
+                "Invalid",
+                GqlStatusError.DIAGNOSTIC_RECORD,
+                null);
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!"));
@@ -549,25 +572,61 @@ class RediscoveryTest {
 
     @Test
     void shouldFailImmediatelyOnAuthTokenManagerExecutionException() {
-        var exception = new AuthTokenManagerExecutionException("message", mock(Throwable.class));
+        var exception = new RuntimeException("message", mock(Throwable.class));
+        Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier = new Supplier<>() {
+            boolean fail;
 
-        Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
-        responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure
-        responsesByAddress.put(B, exception); // second router -> fatal auth error
+            @Override
+            public CompletionStage<Map<String, Value>> get() {
+                if (fail) {
+                    return CompletableFuture.failedStage(exception);
+                } else {
+                    fail = true;
+                    return CompletableFuture.completedFuture(Collections.emptyMap());
+                }
+            }
+        };
 
-        var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
         var rediscovery = newRediscovery(A, Collections::singleton);
         var table = routingTableMock(A, B, C);
 
+        var connectionProviderGetter = (Function<BoltServerAddress, BoltConnectionProvider>) boltServerAddress -> {
+            if (boltServerAddress.equals(A)) {
+                var provider = mock(BoltConnectionProvider.class);
+                given(provider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                        .willAnswer((Answer<CompletionStage<Connection>>) invocationOnMock -> {
+                            @SuppressWarnings("unchecked")
+                            Supplier<CompletionStage<Map<String, Value>>> authSupplier =
+                                    invocationOnMock.getArgument(2, Supplier.class);
+                            return authSupplier.get().thenApply(ignored -> {
+                                throw new CompletionException(new RuntimeException("Hi!"));
+                            });
+                        });
+                return provider;
+            } else if (boltServerAddress.equals(B)) {
+                var provider = mock(BoltConnectionProvider.class);
+                given(provider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                        .willAnswer((Answer<CompletionStage<BoltConnection>>) invocationOnMock -> {
+                            @SuppressWarnings("unchecked")
+                            Supplier<CompletionStage<Map<String, Value>>> authSupplier =
+                                    invocationOnMock.getArgument(2, Supplier.class);
+                            return authSupplier.get().thenApply(ignored -> null);
+                        });
+                return provider;
+            } else {
+                throw new IllegalStateException();
+            }
+        };
+
         var actualException = assertThrows(
-                AuthTokenManagerExecutionException.class,
+                RuntimeException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,
                         connectionProviderGetter,
                         Collections.emptySet(),
                         null,
-                        null,
+                        authMapStageSupplier,
                         new BoltProtocolVersion(4, 1))));
         assertEquals(exception, actualException);
         verify(table).forget(A);
@@ -575,7 +634,7 @@ class RediscoveryTest {
 
     @Test
     void shouldFailImmediatelyOnUnsupportedFeatureException() {
-        var exception = new UnsupportedFeatureException("message", mock(Throwable.class));
+        var exception = new UnsupportedFeatureException("message");
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure

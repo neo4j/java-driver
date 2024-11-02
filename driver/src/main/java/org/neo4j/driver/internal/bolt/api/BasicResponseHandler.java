@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.Neo4jException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
@@ -66,7 +66,7 @@ public final class BasicResponseHandler implements ResponseHandler {
         if (error == null) {
             error = throwable;
         } else {
-            if (error instanceof Neo4jException && !(throwable instanceof Neo4jException)) {
+            if (error instanceof BoltFailureException && !(throwable instanceof BoltFailureException)) {
                 // higher order error has occurred
                 throwable.addSuppressed(error);
                 error = throwable;

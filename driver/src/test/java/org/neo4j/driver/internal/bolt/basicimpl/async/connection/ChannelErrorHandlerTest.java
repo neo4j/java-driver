@@ -34,8 +34,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.ChannelErrorHandler;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.InboundMessageDispatcher;
 

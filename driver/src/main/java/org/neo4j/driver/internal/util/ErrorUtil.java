@@ -33,6 +33,7 @@ import org.neo4j.driver.exceptions.TransactionTerminatedException;
 import org.neo4j.driver.exceptions.TransientException;
 import org.neo4j.driver.internal.bolt.api.GqlError;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 
 public final class ErrorUtil {
     private ErrorUtil() {}
@@ -159,6 +160,173 @@ public final class ErrorUtil {
                         gqlError.message(),
                         gqlError.diagnosticRecord(),
                         map(gqlError.cause()));
+            }
+        }
+    }
+
+    public static Neo4jException map(BoltFailureException exception) {
+        var code = exception.code();
+        switch (extractErrorClass(code)) {
+            case "ClientError" -> {
+                if ("Security".equals(extractErrorSubClass(code))) {
+                    if (code.equalsIgnoreCase("Neo.ClientError.Security.Unauthorized")) {
+                        return new AuthenticationException(
+                                exception.gqlStatus(),
+                                exception.statusDescription(),
+                                code,
+                                exception.getMessage(),
+                                exception.diagnosticRecord(),
+                                map(exception.getCause(), exception));
+                    } else if (code.equalsIgnoreCase("Neo.ClientError.Security.AuthorizationExpired")) {
+                        return new AuthorizationExpiredException(
+                                exception.gqlStatus(),
+                                exception.statusDescription(),
+                                code,
+                                exception.getMessage(),
+                                exception.diagnosticRecord(),
+                                map(exception.getCause(), exception));
+                    } else if (code.equalsIgnoreCase("Neo.ClientError.Security.TokenExpired")) {
+                        return new TokenExpiredException(
+                                exception.gqlStatus(),
+                                exception.statusDescription(),
+                                code,
+                                exception.getMessage(),
+                                exception.diagnosticRecord(),
+                                map(exception.getCause(), exception));
+                    } else {
+                        return new SecurityException(
+                                exception.gqlStatus(),
+                                exception.statusDescription(),
+                                code,
+                                exception.getMessage(),
+                                exception.diagnosticRecord(),
+                                map(exception.getCause(), exception));
+                    }
+                } else {
+                    if (code.equalsIgnoreCase("Neo.ClientError.Database.DatabaseNotFound")) {
+                        return new FatalDiscoveryException(
+                                exception.gqlStatus(),
+                                exception.statusDescription(),
+                                code,
+                                exception.getMessage(),
+                                exception.diagnosticRecord(),
+                                map(exception.getCause(), exception));
+                    } else if (code.equalsIgnoreCase("Neo.ClientError.Transaction.Terminated")) {
+                        return new TransactionTerminatedException(
+                                exception.gqlStatus(),
+                                exception.statusDescription(),
+                                code,
+                                exception.getMessage(),
+                                exception.diagnosticRecord(),
+                                map(exception.getCause(), exception));
+                    } else {
+                        return new org.neo4j.driver.exceptions.ClientException(
+                                exception.gqlStatus(),
+                                exception.statusDescription(),
+                                code,
+                                exception.getMessage(),
+                                exception.diagnosticRecord(),
+                                map(exception.getCause(), exception));
+                    }
+                }
+            }
+            case "TransientError" -> {
+                // Since 5.0 these 2 errors have been moved to ClientError class.
+                // This mapping is required if driver is connection to earlier server versions.
+                if ("Neo.TransientError.Transaction.Terminated".equals(code)) {
+                    return new TransactionTerminatedException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            "Neo.ClientError.Transaction.Terminated",
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                } else if ("Neo.TransientError.Transaction.LockClientStopped".equals(code)) {
+                    return new ClientException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            "Neo.ClientError.Transaction.LockClientStopped",
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                } else {
+                    return new TransientException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            code,
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                }
+            }
+            default -> {
+                if (exception instanceof org.neo4j.driver.internal.bolt.api.exception.AuthorizationExpiredException) {
+                    return new AuthorizationExpiredException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            code,
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                } else if (exception instanceof org.neo4j.driver.internal.bolt.api.exception.SecurityException) {
+                    return new SecurityException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            code,
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                } else if (exception instanceof org.neo4j.driver.internal.bolt.api.exception.FatalDiscoveryException) {
+                    return new FatalDiscoveryException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            code,
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                } else if (exception instanceof org.neo4j.driver.internal.bolt.api.exception.ClientException) {
+                    return new ClientException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            code,
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                } else if (exception instanceof org.neo4j.driver.internal.bolt.api.exception.TransientException) {
+                    return new TransientException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            code,
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                } else {
+                    return new DatabaseException(
+                            exception.gqlStatus(),
+                            exception.statusDescription(),
+                            code,
+                            exception.getMessage(),
+                            exception.diagnosticRecord(),
+                            map(exception.getCause(), exception));
+                }
+            }
+        }
+    }
+
+    public static Throwable map(Throwable throwable, BoltFailureException topBoltFailureException) {
+        if (throwable == null) {
+            return null;
+        } else {
+            if (throwable instanceof BoltFailureException exception) {
+                return new Neo4jException(
+                        exception.gqlStatus(),
+                        exception.statusDescription(),
+                        exception.code(),
+                        exception.getMessage(),
+                        exception.diagnosticRecord(),
+                        map(exception.getCause(), topBoltFailureException));
+            } else {
+                return topBoltFailureException;
             }
         }
     }

@@ -21,6 +21,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
+import java.io.Serial;
 import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -35,15 +36,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.AuthTokenManagerExecutionException;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.DiscoveryException;
-import org.neo4j.driver.exceptions.FatalDiscoveryException;
-import org.neo4j.driver.exceptions.ProtocolException;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -54,7 +46,15 @@ import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.exception.AuthorizationExpiredException;
+import org.neo4j.driver.internal.bolt.api.exception.ClientException;
+import org.neo4j.driver.internal.bolt.api.exception.DiscoveryException;
+import org.neo4j.driver.internal.bolt.api.exception.FatalDiscoveryException;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
+import org.neo4j.driver.internal.bolt.api.exception.ProtocolException;
+import org.neo4j.driver.internal.bolt.api.exception.SecurityException;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
 import org.neo4j.driver.internal.bolt.routedimpl.util.FutureUtil;
 
@@ -352,6 +352,11 @@ public class RediscoveryImpl implements Rediscovery {
         var compositionFuture = new CompletableFuture<ClusterComposition>();
         var connectionRef = new AtomicReference<BoltConnection>();
 
+        Supplier<CompletionStage<Map<String, Value>>> mappingAuthMapStageSupplier =
+                () -> authMapStageSupplier.get().exceptionally(throwable -> {
+                    throw new AuthSupplierException(FutureUtil.completionExceptionCause(throwable));
+                });
+
         addressFuture
                 .thenApply(address ->
                         resolveAddress ? resolveByDomainNameOrThrowCompletionException(address, routingTable) : address)
@@ -361,7 +366,7 @@ public class RediscoveryImpl implements Rediscovery {
                         .connect(
                                 securityPlan,
                                 null,
-                                authMapStageSupplier,
+                                mappingAuthMapStageSupplier,
                                 AccessMode.READ,
                                 bookmarks,
                                 null,
@@ -437,6 +442,9 @@ public class RediscoveryImpl implements Rediscovery {
     private ClusterComposition handleRoutingProcedureError(
             Throwable error, RoutingTable routingTable, BoltServerAddress routerAddress, Throwable baseError) {
         if (mustAbortDiscovery(error)) {
+            if (error instanceof AuthSupplierException) {
+                error = error.getCause();
+            }
             throw new CompletionException(error);
         }
 
@@ -462,7 +470,7 @@ public class RediscoveryImpl implements Rediscovery {
         } else if (throwable instanceof IllegalStateException
                 && "Connection provider is closed.".equals(throwable.getMessage())) {
             abort = true;
-        } else if (throwable instanceof AuthTokenManagerExecutionException) {
+        } else if (throwable instanceof AuthSupplierException) {
             abort = true;
         } else if (throwable instanceof UnsupportedFeatureException) {
             abort = true;
@@ -532,5 +540,14 @@ public class RediscoveryImpl implements Rediscovery {
     private ResolvedBoltServerAddress resolveAllByDomainName(BoltServerAddress address) throws UnknownHostException {
         return new ResolvedBoltServerAddress(
                 address.host(), address.port(), domainNameResolver.resolve(address.host()));
+    }
+
+    static class AuthSupplierException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 2733426469095617934L;
+
+        public AuthSupplierException(Throwable cause) {
+            super(cause);
+        }
     }
 }

@@ -27,7 +27,7 @@ import static org.neo4j.driver.internal.bolt.basicimpl.util.MetadataExtractor.ex
 
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.UntrustedServerException;
+import org.neo4j.driver.internal.bolt.api.exception.UntrustedServerException;
 
 class MetadataExtractorTest {
     private static final String RESULT_AVAILABLE_AFTER_KEY = "available_after";

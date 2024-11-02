@@ -18,11 +18,14 @@ package org.neo4j.driver.internal.bolt.api.exception;
 
 import java.io.Serial;
 
-public class MessageIgnoredException extends BoltException {
+public class ConnectionReadTimeoutException extends ServiceUnavailableException {
     @Serial
-    private static final long serialVersionUID = 8087512561960062490L;
+    private static final long serialVersionUID = 1594795421138021848L;
 
-    public MessageIgnoredException(String message) {
+    public static final ConnectionReadTimeoutException INSTANCE = new ConnectionReadTimeoutException(
+            "Connection read timed out due to it taking longer than the server-supplied timeout value via configuration hint.");
+
+    private ConnectionReadTimeoutException(String message) {
         super(message);
     }
 }

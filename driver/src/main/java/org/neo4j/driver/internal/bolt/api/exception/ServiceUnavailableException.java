@@ -18,11 +18,15 @@ package org.neo4j.driver.internal.bolt.api.exception;
 
 import java.io.Serial;
 
-public class MessageIgnoredException extends BoltException {
+public class ServiceUnavailableException extends BoltException {
     @Serial
-    private static final long serialVersionUID = 8087512561960062490L;
+    private static final long serialVersionUID = -6067446135885175632L;
 
-    public MessageIgnoredException(String message) {
+    public ServiceUnavailableException(String message) {
         super(message);
+    }
+
+    public ServiceUnavailableException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

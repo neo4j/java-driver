@@ -16,10 +16,10 @@
  */
 package org.neo4j.driver.internal.bolt.basicimpl.messaging.request;
 
-import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.bolt.api.exception.ClientException;
 
 public final class MultiDatabaseUtil {
     public static void assertEmptyDatabaseName(DatabaseName databaseName, BoltProtocolVersion boltVersion) {

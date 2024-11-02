@@ -17,12 +17,20 @@
 package org.neo4j.driver.internal.bolt.api.exception;
 
 import java.io.Serial;
+import java.util.Map;
+import org.neo4j.driver.Value;
 
-public class MessageIgnoredException extends BoltException {
+public class AuthorizationExpiredException extends SecurityException {
     @Serial
-    private static final long serialVersionUID = 8087512561960062490L;
+    private static final long serialVersionUID = 534802843324506092L;
 
-    public MessageIgnoredException(String message) {
-        super(message);
+    public AuthorizationExpiredException(
+            String gqlStatus,
+            String statusDescription,
+            String code,
+            String message,
+            Map<String, Value> diagnosticRecord,
+            Throwable cause) {
+        super(gqlStatus, statusDescription, code, message, diagnosticRecord, cause);
     }
 }

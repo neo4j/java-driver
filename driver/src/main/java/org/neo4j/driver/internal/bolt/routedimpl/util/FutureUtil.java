@@ -17,7 +17,6 @@
 package org.neo4j.driver.internal.bolt.routedimpl.util;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static org.neo4j.driver.internal.util.ErrorUtil.addSuppressed;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -77,6 +76,12 @@ public class FutureUtil {
             return asCompletionException(error2);
         } else {
             return null;
+        }
+    }
+
+    private static void addSuppressed(Throwable mainError, Throwable error) {
+        if (mainError != error) {
+            mainError.addSuppressed(error);
         }
     }
 

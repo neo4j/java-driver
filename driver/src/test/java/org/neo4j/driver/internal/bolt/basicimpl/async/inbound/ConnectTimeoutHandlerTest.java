@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
 
 class ConnectTimeoutHandlerTest {
     private final EmbeddedChannel channel = new EmbeddedChannel();

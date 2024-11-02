@@ -227,6 +227,7 @@ public class DriverFactory {
                     clock,
                     loggingProvider);
         }
+        boltConnectionProvider = new ErrorMappingBoltConnectionProvider(boltConnectionProvider);
         return boltConnectionProvider;
     }
 

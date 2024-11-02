@@ -31,7 +31,7 @@ import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelErrorLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.ResponseMessageHandler;
 import org.neo4j.driver.internal.bolt.basicimpl.spi.ResponseHandler;
-import org.neo4j.driver.internal.util.ErrorUtil;
+import org.neo4j.driver.internal.bolt.basicimpl.util.ErrorUtil;
 
 public class InboundMessageDispatcher implements ResponseMessageHandler {
     private final Channel channel;

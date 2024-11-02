@@ -21,7 +21,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.ProtocolException;
+import org.neo4j.driver.internal.bolt.api.exception.ProtocolException;
 import org.neo4j.driver.internal.bolt.basicimpl.spi.ResponseHandler;
 
 public class LogoffResponseHandler implements ResponseHandler {

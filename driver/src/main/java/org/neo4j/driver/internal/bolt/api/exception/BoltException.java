@@ -18,11 +18,15 @@ package org.neo4j.driver.internal.bolt.api.exception;
 
 import java.io.Serial;
 
-public class MessageIgnoredException extends BoltException {
+public class BoltException extends RuntimeException {
     @Serial
-    private static final long serialVersionUID = 8087512561960062490L;
+    private static final long serialVersionUID = 5719509194117540620L;
 
-    public MessageIgnoredException(String message) {
+    public BoltException(String message) {
         super(message);
+    }
+
+    public BoltException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

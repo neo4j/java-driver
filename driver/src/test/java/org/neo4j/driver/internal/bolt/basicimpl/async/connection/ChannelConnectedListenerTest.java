@@ -38,8 +38,8 @@ import java.util.concurrent.TimeUnit;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
 
 class ChannelConnectedListenerTest {
     private final EmbeddedChannel channel = new EmbeddedChannel();

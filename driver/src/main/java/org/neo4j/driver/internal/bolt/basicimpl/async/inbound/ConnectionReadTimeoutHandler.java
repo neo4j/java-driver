@@ -19,7 +19,7 @@ package org.neo4j.driver.internal.bolt.basicimpl.async.inbound;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import java.util.concurrent.TimeUnit;
-import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
+import org.neo4j.driver.internal.bolt.api.exception.ConnectionReadTimeoutException;
 
 public class ConnectionReadTimeoutHandler extends ReadTimeoutHandler {
     private boolean triggered;

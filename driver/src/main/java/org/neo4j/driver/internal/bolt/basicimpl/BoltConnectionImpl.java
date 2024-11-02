@@ -34,12 +34,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
-import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
-import org.neo4j.driver.exceptions.Neo4jException;
-import org.neo4j.driver.exceptions.ProtocolException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.AuthData;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
@@ -53,7 +47,12 @@ import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.TransactionType;
+import org.neo4j.driver.internal.bolt.api.exception.AuthorizationExpiredException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
+import org.neo4j.driver.internal.bolt.api.exception.ConnectionReadTimeoutException;
 import org.neo4j.driver.internal.bolt.api.exception.MessageIgnoredException;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
@@ -527,7 +526,7 @@ public final class BoltConnectionImpl implements BoltConnection {
             } else {
                 stateRef.set(BoltConnectionState.CLOSED);
             }
-        } else if (throwable instanceof Neo4jException) {
+        } else if (throwable instanceof BoltFailureException) {
             if (throwable instanceof AuthorizationExpiredException) {
                 stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.ERROR);
             } else {
@@ -559,9 +558,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         public void onError(Throwable throwable) {
             if (!(throwable instanceof MessageIgnoredException)) {
                 runIgnoringError(() -> delegate.onError(throwable));
-                if (!(throwable instanceof Neo4jException)
-                        || throwable instanceof ServiceUnavailableException
-                        || throwable instanceof ProtocolException) {
+                if (!(throwable instanceof BoltFailureException)) {
                     // assume unrecoverable error, ensure onComplete
                     expectedSummaries = 1;
                 }

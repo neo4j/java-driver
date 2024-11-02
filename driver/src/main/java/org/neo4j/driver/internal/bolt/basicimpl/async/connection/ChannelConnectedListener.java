@@ -24,10 +24,11 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
+import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.SecurityException;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 
 public class ChannelConnectedListener implements ChannelFutureListener {
@@ -61,7 +62,14 @@ public class ChannelConnectedListener implements ChannelFutureListener {
                 if (!f.isSuccess()) {
                     var error = f.cause();
                     if (error instanceof SSLHandshakeException) {
-                        error = new SecurityException("Failed to establish secured connection with the server", error);
+                        var message = "Failed to establish secured connection with the server";
+                        error = new SecurityException(
+                                GqlStatusError.UNKNOWN.getStatus(),
+                                GqlStatusError.UNKNOWN.getStatusDescription(message),
+                                "N/A",
+                                message,
+                                GqlStatusError.DIAGNOSTIC_RECORD,
+                                error);
                     } else {
                         error = new ServiceUnavailableException(
                                 String.format("Unable to write Bolt handshake to %s.", this.address), error);

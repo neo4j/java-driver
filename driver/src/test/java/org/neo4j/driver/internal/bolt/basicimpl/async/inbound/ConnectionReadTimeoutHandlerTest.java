@@ -25,7 +25,7 @@ import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
+import org.neo4j.driver.internal.bolt.api.exception.ConnectionReadTimeoutException;
 
 public class ConnectionReadTimeoutHandlerTest {
     final ConnectionReadTimeoutHandler handler = new ConnectionReadTimeoutHandler(15L, TimeUnit.SECONDS);

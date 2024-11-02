@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.UntrustedServerException;
+import org.neo4j.driver.internal.bolt.api.exception.UntrustedServerException;
 
 public class MetadataExtractor {
     public static final int ABSENT_QUERY_ID = -1;

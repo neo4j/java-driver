@@ -24,8 +24,8 @@ import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelA
 
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
+import org.neo4j.driver.internal.bolt.api.exception.ClientException;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v3.BoltProtocolV3;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v4.BoltProtocolV4;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v41.BoltProtocolV41;

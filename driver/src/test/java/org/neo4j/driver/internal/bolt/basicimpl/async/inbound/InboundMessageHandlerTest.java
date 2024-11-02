@@ -38,8 +38,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelAttributes;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.MessageFormat;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.response.FailureMessage;
@@ -94,7 +94,7 @@ class InboundMessageHandlerTest {
 
         channel.writeInbound(writer.asByteBuf(new FailureMessage("Neo.TransientError.General.ReadOnly", "Hi!")));
 
-        var captor = ArgumentCaptor.forClass(Neo4jException.class);
+        var captor = ArgumentCaptor.forClass(BoltFailureException.class);
         verify(responseHandler).onFailure(captor.capture());
         assertEquals("Neo.TransientError.General.ReadOnly", captor.getValue().code());
         assertEquals("Hi!", captor.getValue().getMessage());

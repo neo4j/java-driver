@@ -22,13 +22,13 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.CodecException;
 import java.io.IOException;
-import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.ConnectionReadTimeoutException;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelAttributes;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelErrorLogger;
-import org.neo4j.driver.internal.util.ErrorUtil;
+import org.neo4j.driver.internal.bolt.basicimpl.util.ErrorUtil;
 
 public class ChannelErrorHandler extends ChannelInboundHandlerAdapter {
     private final LoggingProvider logging;

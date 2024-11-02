@@ -24,6 +24,7 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.neo4j.driver.Values.ofInteger;
 import static org.neo4j.driver.Values.ofValue;
@@ -414,9 +415,11 @@ class ParametersIT {
     private static void expectIOExceptionWithMessage(Value value, String message) {
         var e = assertThrows(ServiceUnavailableException.class, () -> session.run("RETURN {a}", value)
                 .consume());
-        var cause = e.getCause();
-        assertThat(cause, instanceOf(IOException.class));
-        assertThat(cause.getMessage(), equalTo(message));
+        var throwable = e.getCause();
+        assertInstanceOf(org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException.class, throwable);
+        throwable = throwable.getCause();
+        assertThat(throwable, instanceOf(IOException.class));
+        assertThat(throwable.getMessage(), equalTo(message));
     }
 
     private static void testSendAndReceiveValue(Object value) {

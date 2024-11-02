@@ -26,17 +26,17 @@ import io.netty.handler.codec.ReplayingDecoder;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.ClientException;
+import org.neo4j.driver.internal.bolt.api.exception.SecurityException;
+import org.neo4j.driver.internal.bolt.api.exception.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelErrorLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.BoltProtocol;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.MessageFormat;
-import org.neo4j.driver.internal.util.ErrorUtil;
+import org.neo4j.driver.internal.bolt.basicimpl.util.ErrorUtil;
 
 public class HandshakeHandler extends ReplayingDecoder<Void> {
     private final ChannelPipelineBuilder pipelineBuilder;
@@ -179,7 +179,14 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
         if (error instanceof ServiceUnavailableException) {
             return error;
         } else if (error instanceof SSLHandshakeException) {
-            return new SecurityException("Failed to establish secured connection with the server", error);
+            var message = "Failed to establish secured connection with the server";
+            return new SecurityException(
+                    GqlStatusError.UNKNOWN.getStatus(),
+                    GqlStatusError.UNKNOWN.getStatusDescription(message),
+                    "N/A",
+                    message,
+                    GqlStatusError.DIAGNOSTIC_RECORD,
+                    error);
         } else {
             return new ServiceUnavailableException("Failed to establish connection with the server", error);
         }
