@@ -526,7 +526,7 @@ public final class BoltConnectionImpl implements BoltConnection {
             } else {
                 stateRef.set(BoltConnectionState.CLOSED);
             }
-        } else if (throwable instanceof BoltFailureException) {
+        } else if (throwable instanceof BoltFailureException || throwable instanceof MessageIgnoredException) {
             if (throwable instanceof AuthorizationExpiredException) {
                 stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.ERROR);
             } else {
