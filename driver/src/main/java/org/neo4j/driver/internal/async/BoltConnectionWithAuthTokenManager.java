@@ -165,14 +165,10 @@ public class BoltConnectionWithAuthTokenManager implements BoltConnection {
     @Override
     public CompletionStage<Void> flush(ResponseHandler handler) {
         return delegate.flush(new ResponseHandler() {
-            private Throwable error;
 
             @Override
             public void onError(Throwable throwable) {
-                if (error == null) {
-                    error = mapSecurityError(throwable);
-                    handler.onError(error);
-                }
+                handler.onError(mapSecurityError(throwable));
             }
 
             @Override
