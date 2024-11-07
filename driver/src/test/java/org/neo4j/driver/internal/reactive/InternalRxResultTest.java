@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.stubbing.Answer;
+import org.neo4j.driver.Logging;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.internal.InternalRecord;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
@@ -145,6 +146,7 @@ class InternalRxResultTest {
             handler.onRecord(values(2, 2, 2));
             handler.onRecord(values(3, 3, 3));
             handler.onPullSummary(mock());
+            handler.onComplete();
             return CompletableFuture.completedFuture(null);
         });
         var runSummary = mock(RunSummary.class);
@@ -177,6 +179,7 @@ class InternalRxResultTest {
             handler.onRecord(values(2, 2, 2));
             handler.onRecord(values(3, 3, 3));
             handler.onPullSummary(mock());
+            handler.onComplete();
             return CompletableFuture.completedFuture(null);
         });
         var runSummary = mock(RunSummary.class);
@@ -218,6 +221,7 @@ class InternalRxResultTest {
         given(boltConnection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
             var handler = (ResponseHandler) invocation.getArguments()[0];
             handler.onError(error);
+            handler.onComplete();
             return CompletableFuture.completedFuture(null);
         });
         RxResult rxResult = newRxResult(boltConnection);
@@ -257,11 +261,11 @@ class InternalRxResultTest {
                 mock(),
                 runSummary,
                 null,
-                () -> null,
                 databaseBookmark -> {},
                 throwable -> {},
                 false,
-                () -> null);
+                () -> null,
+                Logging.none());
         return newRxResult(cursor);
     }
 
