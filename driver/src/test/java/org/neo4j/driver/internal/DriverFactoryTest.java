@@ -55,7 +55,7 @@ import org.neo4j.driver.internal.security.StaticAuthTokenManager;
 
 class DriverFactoryTest {
     private static Stream<String> testUris() {
-        return Stream.of("bolt://localhost:7687", "neo4j://localhost:7687");
+        return Stream.of("bolt://localhost:7687", "bolt+unix://localhost:7687", "neo4j://localhost:7687");
     }
 
     @ParameterizedTest
