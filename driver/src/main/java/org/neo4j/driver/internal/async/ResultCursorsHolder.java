@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.internal.FailableCursor;
+import org.neo4j.driver.internal.util.Futures;
 
 public class ResultCursorsHolder {
     private final List<CompletionStage<? extends FailableCursor>> cursorStages = new ArrayList<>();
@@ -35,8 +36,11 @@ public class ResultCursorsHolder {
             cursorStages.add(cursorStage);
         }
         cursorStage.thenCompose(FailableCursor::consumed).whenComplete((ignored, throwable) -> {
+            throwable = Futures.completionExceptionCause(throwable);
             synchronized (this) {
-                cursorStages.remove(cursorStage);
+                if (throwable == null) {
+                    cursorStages.remove(cursorStage);
+                }
             }
         });
     }

@@ -207,7 +207,7 @@ public class NetworkSession {
                     apiTelemetryWork.setEnabled(!telemetryDisabled);
                     var runFailed = new AtomicBoolean(false);
                     var responseHandler =
-                            new RunRxResponseHandler(connection, query, this::handleNewBookmark, runFailed);
+                            new RunRxResponseHandler(logging, connection, query, this::handleNewBookmark, runFailed);
                     var cursorStage = apiTelemetryWork
                             .pipelineTelemetryIfEnabled(connection)
                             .thenCompose(conn -> conn.runInAutoCommitTransaction(
@@ -808,6 +808,7 @@ public class NetworkSession {
 
     public static class RunRxResponseHandler implements ResponseHandler {
         final CompletableFuture<RxResultCursor> cursorFuture = new CompletableFuture<>();
+        private final Logging logging;
         private final BoltConnection connection;
         private final Query query;
         private final Consumer<DatabaseBookmark> bookmarkConsumer;
@@ -817,10 +818,12 @@ public class NetworkSession {
         private int ignoredCount;
 
         public RunRxResponseHandler(
+                Logging logging,
                 BoltConnection connection,
                 Query query,
                 Consumer<DatabaseBookmark> bookmarkConsumer,
                 AtomicBoolean runFailed) {
+            this.logging = logging;
             this.connection = connection;
             this.query = query;
             this.bookmarkConsumer = bookmarkConsumer;
@@ -867,11 +870,11 @@ public class NetworkSession {
                         query,
                         runSummary,
                         error,
-                        () -> null,
                         bookmarkConsumer,
                         (ignored) -> {},
                         true,
-                        () -> null));
+                        () -> null,
+                        logging));
             } else {
                 var message = ignoredCount > 0
                         ? "Run exchange contains ignored messages."

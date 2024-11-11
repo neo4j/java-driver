@@ -101,6 +101,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
             "Can't rollback, transaction has been requested to be committed";
     private static final EnumSet<State> OPEN_STATES = EnumSet.of(State.ACTIVE, State.TERMINATED);
 
+    private final Logging logging;
     private final TerminationAwareBoltConnection connection;
     private final Consumer<DatabaseBookmark> bookmarkConsumer;
     private final ResultCursorsHolder resultCursors;
@@ -153,6 +154,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
             NotificationConfig notificationConfig,
             ApiTelemetryWork apiTelemetryWork,
             Logging logging) {
+        this.logging = logging;
         this.connection = new TerminationAwareBoltConnection(connection, this);
         this.databaseName = databaseName;
         this.accessMode = accessMode;
@@ -254,6 +256,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         ensureCanRunQueries();
         var parameters = query.parameters().asMap(Values::value);
         var responseHandler = new RunRxResponseHandler(
+                logging,
                 apiTelemetryWork,
                 () -> executeWithLock(lock, () -> causeOfTermination),
                 this::markTerminated,
@@ -673,6 +676,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
 
     private static class RunRxResponseHandler implements ResponseHandler {
         final CompletableFuture<RxResultCursor> cursorFuture = new CompletableFuture<>();
+        private final Logging logging;
         private final ApiTelemetryWork apiTelemetryWork;
         private final Supplier<Throwable> termSupplier;
         private final Consumer<Throwable> markTerminated;
@@ -685,6 +689,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         private int ignoredCount;
 
         private RunRxResponseHandler(
+                Logging logging,
                 ApiTelemetryWork apiTelemetryWork,
                 Supplier<Throwable> termSupplier,
                 Consumer<Throwable> markTerminated,
@@ -692,6 +697,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                 UnmanagedTransaction transaction,
                 BoltConnection connection,
                 Query query) {
+            this.logging = logging;
             this.apiTelemetryWork = apiTelemetryWork;
             this.termSupplier = termSupplier;
             this.markTerminated = markTerminated;
@@ -747,11 +753,11 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                             query,
                             null,
                             error,
-                            termSupplier,
                             bookmark -> {},
                             transaction::markTerminated,
                             false,
-                            termSupplier));
+                            termSupplier,
+                            logging));
                 }
             } else {
                 if (runSummary != null) {
@@ -760,11 +766,11 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                             query,
                             runSummary,
                             null,
-                            termSupplier,
                             bookmark -> {},
                             transaction::markTerminated,
                             false,
-                            termSupplier));
+                            termSupplier,
+                            logging));
                 } else {
                     var throwable = termSupplier.get();
                     if (throwable == null) {
