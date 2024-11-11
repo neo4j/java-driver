@@ -52,7 +52,7 @@
     <commons-compress.version>1.27.1</commons-compress.version>
     <!-- an optional dependency of commons-compress used by TarArchiveOutputStream -->
     <commons-codec.version>1.17.1</commons-codec.version>
-    <bouncycastle-jdk18on.version>1.78.1</bouncycastle-jdk18on.version>
+    <bouncycastle-jdk18on.version>1.79</bouncycastle-jdk18on.version>
     <logback-classic.version>1.2.13</logback-classic.version>
     <jackson.version>2.18.1</jackson.version>
     <lombok.version>1.18.34</lombok.version>
