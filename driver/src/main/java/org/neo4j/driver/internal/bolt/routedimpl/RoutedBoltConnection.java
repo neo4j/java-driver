@@ -267,7 +267,7 @@ public class RoutedBoltConnection implements BoltConnection {
 
     @Override
     public CompletionStage<Void> close() {
-        provider.decreaseCount(serverAddress());
+        provider.decrementInUseCount(serverAddress());
         return delegate.close();
     }
 
