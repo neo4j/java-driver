@@ -288,11 +288,18 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
 
     @Override
     public CompletionStage<Void> rollback() {
-        log.trace("[%d] Rolling back unpublished result", hashCode());
         synchronized (this) {
-            state = State.SUCCEEDED;
+            log.trace("[%d] Rolling back unpublished result %s state", hashCode(), state);
+            switch (state) {
+                case READY -> state = State.SUCCEEDED;
+                case STREAMING, DISCARDING -> {
+                    return summaryFuture.thenApply(ignored -> null);
+                }
+                case FAILED, SUCCEEDED -> {
+                    return CompletableFuture.completedFuture(null);
+                }
+            }
         }
-        completeSummaryFuture(null, null);
         var resetFuture = new CompletableFuture<Void>();
         boltConnection
                 .reset()
@@ -319,14 +326,17 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
                         resetFuture.completeExceptionally(throwable);
                     }
                 });
-        return resetFuture.thenCompose(ignored -> boltConnection.close()).exceptionally(throwable -> null);
+        return resetFuture
+                .thenCompose(ignored -> boltConnection.close())
+                .whenComplete((ignored, throwable) -> completeSummaryFuture(null, null))
+                .exceptionally(throwable -> null);
     }
 
     @Override
     public void onComplete() {
-        log.trace("[%d] onComplete", hashCode());
         Runnable runnable;
         synchronized (this) {
+            log.trace("[%d] onComplete", hashCode());
             var throwable = interruptSupplier.get();
             if (throwable != null) {
                 handleError(throwable, true);

@@ -199,7 +199,7 @@ public class NetworkSession {
     public CompletionStage<RxResultCursor> runRx(
             Query query, TransactionConfig config, CompletionStage<RxResultCursor> cursorPublishStage) {
         ensureSessionIsOpen();
-        return ensureNoOpenTxBeforeRunningQuery()
+        var newResultCursorStage = ensureNoOpenTxBeforeRunningQuery()
                 .thenCompose(ignore -> acquireConnection(mode))
                 .thenCompose(connection -> {
                     var parameters = query.parameters().asMap(Values::value);
@@ -244,9 +244,12 @@ public class NetworkSession {
                                 }
                             })
                             .thenCompose(Function.identity());
-                    resultCursorStage = cursorStage.exceptionally(error -> null);
                     return cursorStage.thenApply(Function.identity());
                 });
+        resultCursorStage = newResultCursorStage
+                .thenCompose(cursor -> cursor == null ? CompletableFuture.completedFuture(null) : cursorPublishStage)
+                .exceptionally(throwable -> null);
+        return newResultCursorStage;
     }
 
     public CompletionStage<UnmanagedTransaction> beginTransactionAsync(
