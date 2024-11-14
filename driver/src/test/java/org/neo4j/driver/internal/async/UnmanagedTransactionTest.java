@@ -82,6 +82,7 @@ class UnmanagedTransactionTest {
     void shouldFlushOnRunAsync() {
         // Given
         var connection = connectionMock(new BoltProtocolVersion(5, 0));
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         given(connection.run(any(), any())).willReturn(CompletableFuture.completedStage(connection));
@@ -111,6 +112,7 @@ class UnmanagedTransactionTest {
     void shouldFlushOnRunRx() {
         // Given
         var connection = connectionMock(new BoltProtocolVersion(5, 0));
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         given(connection.run(any(), any())).willReturn(CompletableFuture.completedStage(connection));
@@ -139,6 +141,7 @@ class UnmanagedTransactionTest {
     void shouldRollbackOnImplicitFailure() {
         // Given
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
@@ -169,6 +172,7 @@ class UnmanagedTransactionTest {
     @Test
     void shouldBeginTransaction() {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -185,6 +189,7 @@ class UnmanagedTransactionTest {
     @Test
     void shouldBeOpenAfterConstruction() {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -200,6 +205,7 @@ class UnmanagedTransactionTest {
     @Test
     void shouldBeClosedWhenMarkedAsTerminated() {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -216,6 +222,7 @@ class UnmanagedTransactionTest {
     @Test
     void shouldBeClosedWhenMarkedTerminatedAndClosed() {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -235,6 +242,7 @@ class UnmanagedTransactionTest {
     void shouldReleaseConnectionWhenBeginFails() {
         var error = new RuntimeException("Wrong bookmark!");
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -266,6 +274,7 @@ class UnmanagedTransactionTest {
     @Test
     void shouldNotReleaseConnectionWhenBeginSucceeds() {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -423,6 +432,7 @@ class UnmanagedTransactionTest {
     @Test
     void shouldReleaseConnectionWhenClose() {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
             handler.onRollbackSummary(mock(RollbackSummary.class));
@@ -450,6 +460,7 @@ class UnmanagedTransactionTest {
     void shouldReleaseConnectionOnConnectionAuthorizationExpiredExceptionFailure() {
         var exception = new AuthorizationExpiredException("code", "message");
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -481,6 +492,7 @@ class UnmanagedTransactionTest {
     @Test
     void shouldReleaseConnectionOnConnectionReadTimeoutExceptionFailure() {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -523,6 +535,7 @@ class UnmanagedTransactionTest {
     void shouldReturnExistingStageOnSimilarCompletingAction(
             boolean protocolCommit, String initialAction, String similarAction) {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willReturn(CompletableFuture.completedStage(null));
@@ -573,6 +586,7 @@ class UnmanagedTransactionTest {
             String conflictingAction,
             String expectedErrorMsg) {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
         if (protocolActionCompleted) {
@@ -636,6 +650,7 @@ class UnmanagedTransactionTest {
     void shouldReturnCompletedWithNullStageOnClosingInactiveTransactionExceptCommittingAborted(
             boolean protocolCommit, int expectedProtocolInvocations, String originalAction, Boolean commitOnClose) {
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
         setupConnectionAnswers(connection, List.of(handler -> {
@@ -677,6 +692,7 @@ class UnmanagedTransactionTest {
     void shouldTerminateOnTerminateAsync() {
         // Given
         var connection = connectionMock(new BoltProtocolVersion(4, 0));
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         given(connection.clear()).willReturn(CompletableFuture.completedStage(connection));
@@ -706,6 +722,7 @@ class UnmanagedTransactionTest {
     void shouldServeTheSameStageOnTerminateAsync() {
         // Given
         var connection = connectionMock(new BoltProtocolVersion(4, 0));
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         given(connection.clear()).willReturn(CompletableFuture.completedStage(connection));
@@ -735,6 +752,7 @@ class UnmanagedTransactionTest {
     void shouldHandleTerminationWhenAlreadyTerminated() throws ExecutionException, InterruptedException {
         // Given
         var connection = connectionMock(new BoltProtocolVersion(4, 0));
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         given(connection.run(any(), any())).willReturn(CompletableFuture.completedStage(connection));
@@ -771,6 +789,7 @@ class UnmanagedTransactionTest {
     void shouldThrowOnRunningNewQueriesWhenTransactionIsClosing(TransactionClosingTestParams testParams) {
         // Given
         var connection = connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));

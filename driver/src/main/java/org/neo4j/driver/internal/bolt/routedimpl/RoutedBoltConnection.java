@@ -72,6 +72,11 @@ public class RoutedBoltConnection implements BoltConnection {
     }
 
     @Override
+    public CompletionStage<BoltConnection> onLoop() {
+        return delegate.onLoop();
+    }
+
+    @Override
     public CompletionStage<BoltConnection> route(
             DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks) {
         return delegate.route(databaseName, impersonatedUser, bookmarks).thenApply(ignored -> this);

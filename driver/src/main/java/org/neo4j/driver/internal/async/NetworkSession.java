@@ -20,7 +20,6 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.neo4j.driver.internal.util.Futures.completedWithNull;
 import static org.neo4j.driver.internal.util.Futures.completionExceptionCause;
 
-import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -56,19 +55,15 @@ import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.DatabaseBookmark;
 import org.neo4j.driver.internal.FailableCursor;
 import org.neo4j.driver.internal.NotificationConfigMapper;
-import org.neo4j.driver.internal.bolt.api.AuthData;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
-import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
-import org.neo4j.driver.internal.bolt.api.TransactionType;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.cursor.DisposableResultCursorImpl;
@@ -153,7 +148,7 @@ public class NetworkSession {
                     var apiTelemetryWork = new ApiTelemetryWork(TelemetryApi.AUTO_COMMIT_TRANSACTION);
                     apiTelemetryWork.setEnabled(!telemetryDisabled);
                     var resultCursor = new ResultCursorImpl(
-                            connection, query, fetchSize, null, this::handleNewBookmark, true, () -> null, null, null);
+                            connection, query, fetchSize, this::handleNewBookmark, true, null, null);
                     var cursorStage = apiTelemetryWork
                             .pipelineTelemetryIfEnabled(connection)
                             .thenCompose(conn -> conn.runInAutoCommitTransaction(
@@ -320,7 +315,7 @@ public class NetworkSession {
                 })
                 .thenCompose(ignore -> connectionStage)
                 .thenCompose(connection -> {
-                    if (connection != null && !connection.closed.get()) {
+                    if (connection != null && connection.isOpen()) {
                         var future = new CompletableFuture<Void>();
                         return connection
                                 .reset()
@@ -400,7 +395,7 @@ public class NetworkSession {
                 && // no acquisition error
                 connection != null
                 && // some connection has actually been acquired
-                !connection.closed.get()); // and it's still open
+                connection.isOpen()); // and it's still open
     }
 
     private org.neo4j.driver.internal.bolt.api.AccessMode asBoltAccessMode(AccessMode mode) {
@@ -607,163 +602,6 @@ public class NetworkSession {
         }
     }
 
-    private static class BoltConnectionWithCloseTracking implements BoltConnection {
-        private final BoltConnection connection;
-        private final AtomicBoolean closed = new AtomicBoolean(false);
-
-        private BoltConnectionWithCloseTracking(BoltConnection connection) {
-            this.connection = connection;
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> route(
-                DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks) {
-            return connection.route(databaseName, impersonatedUser, bookmarks);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> beginTransaction(
-                DatabaseName databaseName,
-                org.neo4j.driver.internal.bolt.api.AccessMode accessMode,
-                String impersonatedUser,
-                Set<String> bookmarks,
-                TransactionType transactionType,
-                Duration txTimeout,
-                Map<String, Value> txMetadata,
-                String txType,
-                NotificationConfig notificationConfig) {
-            return connection.beginTransaction(
-                    databaseName,
-                    accessMode,
-                    impersonatedUser,
-                    bookmarks,
-                    transactionType,
-                    txTimeout,
-                    txMetadata,
-                    txType,
-                    notificationConfig);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> runInAutoCommitTransaction(
-                DatabaseName databaseName,
-                org.neo4j.driver.internal.bolt.api.AccessMode accessMode,
-                String impersonatedUser,
-                Set<String> bookmarks,
-                String query,
-                Map<String, Value> parameters,
-                Duration txTimeout,
-                Map<String, Value> txMetadata,
-                NotificationConfig notificationConfig) {
-            return connection.runInAutoCommitTransaction(
-                    databaseName,
-                    accessMode,
-                    impersonatedUser,
-                    bookmarks,
-                    query,
-                    parameters,
-                    txTimeout,
-                    txMetadata,
-                    notificationConfig);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> run(String query, Map<String, Value> parameters) {
-            return connection.run(query, parameters);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> pull(long qid, long request) {
-            return connection.pull(qid, request);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> discard(long qid, long number) {
-            return connection.discard(qid, number);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> commit() {
-            return connection.commit();
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> rollback() {
-            return connection.rollback();
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> reset() {
-            return connection.reset();
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> logoff() {
-            return connection.logoff();
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> logon(Map<String, Value> authMap) {
-            return connection.logon(authMap);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> telemetry(TelemetryApi telemetryApi) {
-            return connection.telemetry(telemetryApi);
-        }
-
-        @Override
-        public CompletionStage<BoltConnection> clear() {
-            return connection.clear();
-        }
-
-        @Override
-        public CompletionStage<Void> flush(ResponseHandler handler) {
-            return connection.flush(handler);
-        }
-
-        @Override
-        public CompletionStage<Void> forceClose(String reason) {
-            return connection.forceClose(reason);
-        }
-
-        @Override
-        public CompletionStage<Void> close() {
-            closed.set(true);
-            return connection.close();
-        }
-
-        @Override
-        public BoltConnectionState state() {
-            return connection.state();
-        }
-
-        @Override
-        public CompletionStage<AuthData> authData() {
-            return connection.authData();
-        }
-
-        @Override
-        public String serverAgent() {
-            return connection.serverAgent();
-        }
-
-        @Override
-        public BoltServerAddress serverAddress() {
-            return connection.serverAddress();
-        }
-
-        @Override
-        public BoltProtocolVersion protocolVersion() {
-            return connection.protocolVersion();
-        }
-
-        @Override
-        public boolean telemetrySupported() {
-            return connection.telemetrySupported();
-        }
-    }
-
     /**
      * The {@link NetworkSessionConnectionContext#mode} can be mutable for a session connection context
      */
@@ -833,21 +671,15 @@ public class NetworkSession {
             this.runFailed = runFailed;
         }
 
-        @SuppressWarnings("DuplicatedCode")
         @Override
         public void onError(Throwable throwable) {
-            if (throwable instanceof CompletionException) {
-                throwable = throwable.getCause();
-            }
+            throwable = Futures.completionExceptionCause(throwable);
             if (error == null) {
                 error = throwable;
             } else {
                 if (error instanceof Neo4jException && !(throwable instanceof Neo4jException)) {
                     // higher order error has occurred
-                    throwable.addSuppressed(error);
                     error = throwable;
-                } else {
-                    error.addSuppressed(throwable);
                 }
             }
         }
@@ -868,16 +700,8 @@ public class NetworkSession {
                 if (error != null) {
                     runFailed.set(true);
                 }
-                cursorFuture.complete(new RxResultCursorImpl(
-                        connection,
-                        query,
-                        runSummary,
-                        error,
-                        bookmarkConsumer,
-                        (ignored) -> {},
-                        true,
-                        () -> null,
-                        logging));
+                cursorFuture.complete(
+                        new RxResultCursorImpl(connection, query, runSummary, error, bookmarkConsumer, true, logging));
             } else {
                 var message = ignoredCount > 0
                         ? "Run exchange contains ignored messages."

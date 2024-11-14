@@ -257,15 +257,7 @@ class InternalRxResultTest {
 
     private InternalRxResult newRxResult(BoltConnection boltConnection, RunSummary runSummary) {
         RxResultCursor cursor = new RxResultCursorImpl(
-                boltConnection,
-                mock(),
-                runSummary,
-                null,
-                databaseBookmark -> {},
-                throwable -> {},
-                false,
-                () -> null,
-                Logging.none());
+                boltConnection, mock(), runSummary, null, databaseBookmark -> {}, false, Logging.none());
         return newRxResult(cursor);
     }
 

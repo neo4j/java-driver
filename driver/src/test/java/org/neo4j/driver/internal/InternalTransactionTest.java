@@ -68,6 +68,7 @@ class InternalTransactionTest {
     void setUp() {
         connection = connectionMock(new BoltProtocolVersion(4, 0));
         var connectionProvider = mock(BoltConnectionProvider.class);
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedFuture(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))

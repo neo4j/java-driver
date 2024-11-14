@@ -115,6 +115,11 @@ public final class BoltConnectionImpl implements BoltConnection {
     }
 
     @Override
+    public CompletionStage<BoltConnection> onLoop() {
+        return executeInEventLoop(() -> {}).thenApply(ignored -> this);
+    }
+
+    @Override
     public CompletionStage<BoltConnection> route(
             DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks) {
         return executeInEventLoop(() -> messageWriters.add(handler -> protocol.route(
@@ -499,14 +504,14 @@ public final class BoltConnectionImpl implements BoltConnection {
     }
 
     private CompletionStage<Void> executeInEventLoop(Runnable runnable) {
-        var executeStage = new CompletableFuture<Void>();
+        var executeFuture = new CompletableFuture<Void>();
         Runnable stageCompletingRunnable = () -> {
             try {
                 runnable.run();
             } catch (Throwable throwable) {
-                executeStage.completeExceptionally(throwable);
+                executeFuture.completeExceptionally(throwable);
             }
-            executeStage.complete(null);
+            executeFuture.complete(null);
         };
         if (eventLoop.inEventLoop()) {
             stageCompletingRunnable.run();
@@ -514,10 +519,10 @@ public final class BoltConnectionImpl implements BoltConnection {
             try {
                 eventLoop.execute(stageCompletingRunnable);
             } catch (Throwable throwable) {
-                executeStage.completeExceptionally(throwable);
+                executeFuture.completeExceptionally(throwable);
             }
         }
-        return executeStage;
+        return executeFuture;
     }
 
     private void updateState(Throwable throwable) {

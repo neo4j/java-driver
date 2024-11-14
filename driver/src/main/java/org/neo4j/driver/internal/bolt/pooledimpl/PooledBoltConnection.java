@@ -22,7 +22,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Function;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.exceptions.AuthorizationExpiredException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
@@ -65,6 +64,11 @@ public class PooledBoltConnection implements BoltConnection {
         this.provider = Objects.requireNonNull(provider);
         this.releaseRunnable = Objects.requireNonNull(releaseRunnable);
         this.purgeRunnable = Objects.requireNonNull(purgeRunnable);
+    }
+
+    @Override
+    public CompletionStage<BoltConnection> onLoop() {
+        return delegate.onLoop();
     }
 
     @Override
@@ -294,23 +298,14 @@ public class PooledBoltConnection implements BoltConnection {
             delegate.reset()
                     .thenCompose(boltConnection -> boltConnection.flush(resetHandler))
                     .thenCompose(ignored -> resetHandler.summaries())
-                    .handle((ignored, throwable) -> {
-                        if (throwable != null) {
-                            return delegate()
-                                    .close()
-                                    .whenComplete((closeResult, closeThrowable) -> purgeRunnable.run());
-                        } else {
-                            return CompletableFuture.<Void>completedStage(null)
-                                    .whenComplete((ignoredResult, nothing) -> releaseRunnable.run());
-                        }
-                    })
-                    .thenCompose(Function.identity())
                     .whenComplete((ignored, throwable) -> {
                         if (throwable != null) {
-                            closeFuture.completeExceptionally(throwable);
+                            delegate.close().whenComplete((closeResult, closeThrowable) -> purgeRunnable.run());
                         } else {
-                            closeFuture.complete(null);
+                            CompletableFuture.<Void>completedStage(null)
+                                    .whenComplete((ignoredResult, nothing) -> releaseRunnable.run());
                         }
+                        closeFuture.complete(null);
                     });
         }
 
@@ -329,7 +324,7 @@ public class PooledBoltConnection implements BoltConnection {
 
     @Override
     public String serverAgent() {
-        return delegate().serverAgent();
+        return delegate.serverAgent();
     }
 
     @Override

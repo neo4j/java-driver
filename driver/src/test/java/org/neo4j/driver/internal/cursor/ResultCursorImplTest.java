@@ -77,16 +77,7 @@ class ResultCursorImplTest {
     void beforeEach() {
         openMocks(this);
         given(connection.protocolVersion()).willReturn(new BoltProtocolVersion(5, 5));
-        cursor = new ResultCursorImpl(
-                connection,
-                query,
-                fetchSize,
-                throwableConsumer,
-                bookmarkConsumer,
-                closeOnSummary,
-                termSupplier,
-                null,
-                null);
+        cursor = new ResultCursorImpl(connection, query, fetchSize, bookmarkConsumer, closeOnSummary, null, null);
         cursor.onRunSummary(runSummary);
     }
 
