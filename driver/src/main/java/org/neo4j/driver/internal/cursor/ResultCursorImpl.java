@@ -28,7 +28,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import org.neo4j.driver.Bookmark;
 import org.neo4j.driver.Query;
 import org.neo4j.driver.Record;
@@ -69,9 +68,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
     private final Queue<Record> records = new ArrayDeque<>();
     private final Query query;
     private final long fetchSize;
-    private final Consumer<Throwable> throwableConsumer;
     private final Consumer<DatabaseBookmark> bookmarkConsumer;
-    private final Supplier<Throwable> termSupplier;
     private final boolean closeOnSummary;
     private final boolean legacyNotifications;
     private final CompletableFuture<ResultCursorImpl> resultCursorFuture = new CompletableFuture<>();
@@ -104,10 +101,8 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             BoltConnection boltConnection,
             Query query,
             long fetchSize,
-            Consumer<Throwable> throwableConsumer,
             Consumer<DatabaseBookmark> bookmarkConsumer,
             boolean closeOnSummary,
-            Supplier<Throwable> termSupplier,
             CompletableFuture<UnmanagedTransaction> beginFuture,
             ApiTelemetryWork apiTelemetryWork) {
         this.boltConnection = Objects.requireNonNull(boltConnection);
@@ -115,11 +110,9 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         updateRecordState(RecordState.REQUESTED);
         this.query = Objects.requireNonNull(query);
         this.fetchSize = fetchSize;
-        this.throwableConsumer = throwableConsumer;
         this.bookmarkConsumer = Objects.requireNonNull(bookmarkConsumer);
         this.closeOnSummary = closeOnSummary;
         this.state = State.STREAMING;
-        this.termSupplier = termSupplier;
         this.beginFuture = beginFuture;
         this.apiTelemetryWork = apiTelemetryWork;
     }
@@ -149,36 +142,28 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         CompletionStage<ResultSummary> summaryFt =
                 switch (state) {
                     case READY -> {
-                        var term = termSupplier.get();
-                        if (term == null) {
-                            apiCallInProgress = true;
-                            summaryFuture = new CompletableFuture<>();
-                            var future = summaryFuture;
-                            state = State.DISCARDING;
-                            boltConnection
-                                    .discard(runSummary.queryId(), -1)
-                                    .thenCompose(conn -> conn.flush(this))
-                                    .whenComplete((ignored, throwable) -> {
-                                        var error = Futures.completionExceptionCause(throwable);
-                                        CompletableFuture<ResultSummary> summaryFuture;
-                                        if (error != null) {
-                                            synchronized (this) {
-                                                state = State.FAILED;
-                                                errorExposed = true;
-                                                summaryFuture = this.summaryFuture;
-                                                this.summaryFuture = null;
-                                                apiCallInProgress = false;
-                                            }
-                                            summaryFuture.completeExceptionally(error);
+                        apiCallInProgress = true;
+                        summaryFuture = new CompletableFuture<>();
+                        var future = summaryFuture;
+                        state = State.DISCARDING;
+                        boltConnection
+                                .discard(runSummary.queryId(), -1)
+                                .thenCompose(conn -> conn.flush(this))
+                                .whenComplete((ignored, throwable) -> {
+                                    var error = Futures.completionExceptionCause(throwable);
+                                    CompletableFuture<ResultSummary> summaryFuture;
+                                    if (error != null) {
+                                        synchronized (this) {
+                                            state = State.FAILED;
+                                            errorExposed = true;
+                                            summaryFuture = this.summaryFuture;
+                                            this.summaryFuture = null;
+                                            apiCallInProgress = false;
                                         }
-                                    });
-                            yield future;
-                        } else {
-                            this.error = term;
-                            this.state = State.FAILED;
-                            this.errorExposed = true;
-                            yield CompletableFuture.failedStage(error);
-                        }
+                                        summaryFuture.completeExceptionally(error);
+                                    }
+                                });
+                        yield future;
                     }
                     case STREAMING -> {
                         apiCallInProgress = true;
@@ -236,37 +221,29 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             // buffer is empty
             return switch (state) {
                 case READY -> {
-                    var term = termSupplier.get();
-                    if (term == null) {
-                        apiCallInProgress = true;
-                        recordFuture = new CompletableFuture<>();
-                        var result = recordFuture;
-                        state = State.STREAMING;
-                        updateRecordState(RecordState.NO_RECORD);
-                        boltConnection
-                                .pull(runSummary.queryId(), fetchSize)
-                                .thenCompose(conn -> conn.flush(this))
-                                .whenComplete((ignored, throwable) -> {
-                                    var error = Futures.completionExceptionCause(throwable);
-                                    CompletableFuture<Record> recordFuture;
-                                    if (error != null) {
-                                        synchronized (this) {
-                                            state = State.FAILED;
-                                            errorExposed = true;
-                                            recordFuture = this.recordFuture;
-                                            this.recordFuture = null;
-                                            apiCallInProgress = false;
-                                        }
-                                        recordFuture.completeExceptionally(error);
+                    apiCallInProgress = true;
+                    recordFuture = new CompletableFuture<>();
+                    var result = recordFuture;
+                    state = State.STREAMING;
+                    updateRecordState(RecordState.NO_RECORD);
+                    boltConnection
+                            .pull(runSummary.queryId(), fetchSize)
+                            .thenCompose(conn -> conn.flush(this))
+                            .whenComplete((ignored, throwable) -> {
+                                var error = Futures.completionExceptionCause(throwable);
+                                CompletableFuture<Record> recordFuture;
+                                if (error != null) {
+                                    synchronized (this) {
+                                        state = State.FAILED;
+                                        errorExposed = true;
+                                        recordFuture = this.recordFuture;
+                                        this.recordFuture = null;
+                                        apiCallInProgress = false;
                                     }
-                                });
-                        yield result;
-                    } else {
-                        this.error = term;
-                        this.state = State.FAILED;
-                        this.errorExposed = true;
-                        yield CompletableFuture.failedStage(error);
-                    }
+                                    recordFuture.completeExceptionally(error);
+                                }
+                            });
+                    yield result;
                 }
                 case STREAMING -> {
                     apiCallInProgress = true;
@@ -309,37 +286,29 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             // buffer is empty
             return switch (state) {
                 case READY -> {
-                    var term = termSupplier.get();
-                    if (term == null) {
-                        apiCallInProgress = true;
-                        peekFuture = new CompletableFuture<>();
-                        var future = peekFuture;
-                        state = State.STREAMING;
-                        updateRecordState(RecordState.NO_RECORD);
-                        boltConnection
-                                .pull(runSummary.queryId(), fetchSize)
-                                .thenCompose(conn -> conn.flush(this))
-                                .whenComplete((ignored, throwable) -> {
-                                    var error = Futures.completionExceptionCause(throwable);
-                                    if (error != null) {
-                                        CompletableFuture<Record> peekFuture;
-                                        synchronized (this) {
-                                            state = State.FAILED;
-                                            errorExposed = true;
-                                            recordFuture = this.peekFuture;
-                                            this.peekFuture = null;
-                                            apiCallInProgress = false;
-                                        }
-                                        recordFuture.completeExceptionally(error);
+                    apiCallInProgress = true;
+                    peekFuture = new CompletableFuture<>();
+                    var future = peekFuture;
+                    state = State.STREAMING;
+                    updateRecordState(RecordState.NO_RECORD);
+                    boltConnection
+                            .pull(runSummary.queryId(), fetchSize)
+                            .thenCompose(conn -> conn.flush(this))
+                            .whenComplete((ignored, throwable) -> {
+                                var error = Futures.completionExceptionCause(throwable);
+                                if (error != null) {
+                                    CompletableFuture<Record> peekFuture;
+                                    synchronized (this) {
+                                        state = State.FAILED;
+                                        errorExposed = true;
+                                        recordFuture = this.peekFuture;
+                                        this.peekFuture = null;
+                                        apiCallInProgress = false;
                                     }
-                                });
-                        yield future;
-                    } else {
-                        this.error = term;
-                        this.state = State.FAILED;
-                        this.errorExposed = true;
-                        yield CompletableFuture.failedStage(error);
-                    }
+                                    recordFuture.completeExceptionally(error);
+                                }
+                            });
+                    yield future;
                 }
                 case STREAMING -> {
                     apiCallInProgress = true;
@@ -385,54 +354,46 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             return switch (state) {
                 case READY -> {
                     if (records.isEmpty()) {
-                        var term = termSupplier.get();
-                        if (term == null) {
-                            apiCallInProgress = true;
-                            recordFuture = new CompletableFuture<>();
-                            secondRecordFuture = new CompletableFuture<>();
-                            var singleFuture = recordFuture.thenCompose(firstRecord -> {
-                                if (firstRecord == null) {
+                        apiCallInProgress = true;
+                        recordFuture = new CompletableFuture<>();
+                        secondRecordFuture = new CompletableFuture<>();
+                        var singleFuture = recordFuture.thenCompose(firstRecord -> {
+                            if (firstRecord == null) {
+                                throw new NoSuchRecordException(
+                                        "Cannot retrieve a single record, because this result is empty.");
+                            }
+                            return secondRecordFuture.thenApply(secondRecord -> {
+                                if (secondRecord) {
                                     throw new NoSuchRecordException(
-                                            "Cannot retrieve a single record, because this result is empty.");
+                                            "Expected a result with a single record, but this result contains at least one more. Ensure your query returns only one record.");
                                 }
-                                return secondRecordFuture.thenApply(secondRecord -> {
-                                    if (secondRecord) {
-                                        throw new NoSuchRecordException(
-                                                "Expected a result with a single record, but this result contains at least one more. Ensure your query returns only one record.");
-                                    }
-                                    return firstRecord;
-                                });
+                                return firstRecord;
                             });
-                            state = State.STREAMING;
-                            updateRecordState(RecordState.NO_RECORD);
-                            boltConnection
-                                    .pull(runSummary.queryId(), fetchSize)
-                                    .thenCompose(conn -> conn.flush(this))
-                                    .whenComplete((ignored, throwable) -> {
-                                        var error = Futures.completionExceptionCause(throwable);
-                                        if (error != null) {
-                                            CompletableFuture<Record> recordFuture;
-                                            CompletableFuture<Boolean> secondRecordFuture;
-                                            synchronized (this) {
-                                                state = State.FAILED;
-                                                errorExposed = true;
-                                                recordFuture = this.recordFuture;
-                                                this.recordFuture = null;
-                                                secondRecordFuture = this.secondRecordFuture;
-                                                this.secondRecordFuture = null;
-                                                apiCallInProgress = false;
-                                            }
-                                            recordFuture.completeExceptionally(error);
-                                            secondRecordFuture.completeExceptionally(error);
+                        });
+                        state = State.STREAMING;
+                        updateRecordState(RecordState.NO_RECORD);
+                        boltConnection
+                                .pull(runSummary.queryId(), fetchSize)
+                                .thenCompose(conn -> conn.flush(this))
+                                .whenComplete((ignored, throwable) -> {
+                                    var error = Futures.completionExceptionCause(throwable);
+                                    if (error != null) {
+                                        CompletableFuture<Record> recordFuture;
+                                        CompletableFuture<Boolean> secondRecordFuture;
+                                        synchronized (this) {
+                                            state = State.FAILED;
+                                            errorExposed = true;
+                                            recordFuture = this.recordFuture;
+                                            this.recordFuture = null;
+                                            secondRecordFuture = this.secondRecordFuture;
+                                            this.secondRecordFuture = null;
+                                            apiCallInProgress = false;
                                         }
-                                    });
-                            yield singleFuture;
-                        } else {
-                            this.error = term;
-                            this.state = State.FAILED;
-                            this.errorExposed = true;
-                            yield CompletableFuture.failedStage(error);
-                        }
+                                        recordFuture.completeExceptionally(error);
+                                        secondRecordFuture.completeExceptionally(error);
+                                    }
+                                });
+                        yield singleFuture;
                     } else {
                         // records is not empty and the state is READY, meaning the result is not exhausted
                         yield CompletableFuture.failedStage(
@@ -535,37 +496,29 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         }
         return switch (state) {
             case READY -> {
-                var term = termSupplier.get();
-                if (term == null) {
-                    apiCallInProgress = true;
-                    recordsFuture = new CompletableFuture<>();
-                    var future = recordsFuture;
-                    state = State.STREAMING;
-                    updateRecordState(RecordState.NO_RECORD);
-                    boltConnection
-                            .pull(runSummary.queryId(), -1)
-                            .thenCompose(conn -> conn.flush(this))
-                            .whenComplete((ignored, throwable) -> {
-                                var error = Futures.completionExceptionCause(throwable);
-                                CompletableFuture<List<Record>> recordsFuture;
-                                if (error != null) {
-                                    synchronized (this) {
-                                        state = State.FAILED;
-                                        errorExposed = true;
-                                        recordsFuture = this.recordsFuture;
-                                        this.recordsFuture = null;
-                                        apiCallInProgress = false;
-                                    }
-                                    recordsFuture.completeExceptionally(error);
+                apiCallInProgress = true;
+                recordsFuture = new CompletableFuture<>();
+                var future = recordsFuture;
+                state = State.STREAMING;
+                updateRecordState(RecordState.NO_RECORD);
+                boltConnection
+                        .pull(runSummary.queryId(), -1)
+                        .thenCompose(conn -> conn.flush(this))
+                        .whenComplete((ignored, throwable) -> {
+                            var error = Futures.completionExceptionCause(throwable);
+                            CompletableFuture<List<Record>> recordsFuture;
+                            if (error != null) {
+                                synchronized (this) {
+                                    state = State.FAILED;
+                                    errorExposed = true;
+                                    recordsFuture = this.recordsFuture;
+                                    this.recordsFuture = null;
+                                    apiCallInProgress = false;
                                 }
-                            });
-                    yield future;
-                } else {
-                    this.error = term;
-                    this.state = State.FAILED;
-                    this.errorExposed = true;
-                    yield CompletableFuture.failedStage(error);
-                }
+                                recordsFuture.completeExceptionally(error);
+                            }
+                        });
+                yield future;
             }
             case STREAMING -> {
                 apiCallInProgress = true;
@@ -676,6 +629,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         }
     }
 
+    @SuppressWarnings("DuplicatedCode")
     @Override
     public synchronized void onError(Throwable throwable) {
         throwable = Futures.completionExceptionCause(throwable);
@@ -685,23 +639,16 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             if (throwable == IGNORED_ERROR) {
                 return;
             }
-            if (error instanceof Neo4jException && !(throwable instanceof Neo4jException)) {
+            if (error == IGNORED_ERROR || (error instanceof Neo4jException && !(throwable instanceof Neo4jException))) {
                 // higher order error has occurred
-                throwable.addSuppressed(error);
                 error = throwable;
-            } else {
-                error.addSuppressed(throwable);
             }
         }
     }
 
     @Override
     public void onIgnored() {
-        var throwable = termSupplier.get();
-        if (throwable == null) {
-            throwable = IGNORED_ERROR;
-        }
-        onError(throwable);
+        onError(IGNORED_ERROR);
     }
 
     @SuppressWarnings("DuplicatedCode")
@@ -811,67 +758,47 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             CompletableFuture<Boolean> secondRecordFuture = null;
             synchronized (this) {
                 if (this.peekFuture != null) {
-                    var term = termSupplier.get();
-                    if (term == null) {
-                        // peek is pending, keep streaming
-                        state = State.STREAMING;
-                        updateRecordState(RecordState.NO_RECORD);
-                        boltConnection
-                                .pull(runSummary.queryId(), fetchSize)
-                                .thenCompose(conn -> conn.flush(this))
-                                .whenComplete((ignored, throwable) -> {
-                                    var error = Futures.completionExceptionCause(throwable);
-                                    if (error != null) {
-                                        CompletableFuture<Record> peekFuture;
-                                        synchronized (this) {
-                                            state = State.FAILED;
-                                            errorExposed = true;
-                                            peekFuture = this.peekFuture;
-                                            this.peekFuture = null;
-                                            apiCallInProgress = false;
-                                        }
-                                        peekFuture.completeExceptionally(error);
+                    // peek is pending, keep streaming
+                    state = State.STREAMING;
+                    updateRecordState(RecordState.NO_RECORD);
+                    boltConnection
+                            .pull(runSummary.queryId(), fetchSize)
+                            .thenCompose(conn -> conn.flush(this))
+                            .whenComplete((ignored, throwable) -> {
+                                var error = Futures.completionExceptionCause(throwable);
+                                if (error != null) {
+                                    CompletableFuture<Record> peekFuture;
+                                    synchronized (this) {
+                                        state = State.FAILED;
+                                        errorExposed = true;
+                                        peekFuture = this.peekFuture;
+                                        this.peekFuture = null;
+                                        apiCallInProgress = false;
                                     }
-                                });
-                    } else {
-                        this.error = term;
-                        this.state = State.FAILED;
-                        this.errorExposed = true;
-                        var peekFuture = this.peekFuture;
-                        this.peekFuture = null;
-                        peekFuture.completeExceptionally(error);
-                    }
+                                    peekFuture.completeExceptionally(error);
+                                }
+                            });
                 } else if (this.recordFuture != null) {
-                    var term = termSupplier.get();
-                    if (term == null) {
-                        // next is pending, keep streaming
-                        state = State.STREAMING;
-                        updateRecordState(RecordState.NO_RECORD);
-                        boltConnection
-                                .pull(runSummary.queryId(), fetchSize)
-                                .thenCompose(conn -> conn.flush(this))
-                                .whenComplete((ignored, throwable) -> {
-                                    var error = Futures.completionExceptionCause(throwable);
-                                    if (error != null) {
-                                        CompletableFuture<Record> recordFuture;
-                                        synchronized (this) {
-                                            state = State.FAILED;
-                                            errorExposed = true;
-                                            recordFuture = this.recordFuture;
-                                            this.recordFuture = null;
-                                            apiCallInProgress = false;
-                                        }
-                                        recordFuture.completeExceptionally(error);
+                    // next is pending, keep streaming
+                    state = State.STREAMING;
+                    updateRecordState(RecordState.NO_RECORD);
+                    boltConnection
+                            .pull(runSummary.queryId(), fetchSize)
+                            .thenCompose(conn -> conn.flush(this))
+                            .whenComplete((ignored, throwable) -> {
+                                var error = Futures.completionExceptionCause(throwable);
+                                if (error != null) {
+                                    CompletableFuture<Record> recordFuture;
+                                    synchronized (this) {
+                                        state = State.FAILED;
+                                        errorExposed = true;
+                                        recordFuture = this.recordFuture;
+                                        this.recordFuture = null;
+                                        apiCallInProgress = false;
                                     }
-                                });
-                    } else {
-                        this.error = term;
-                        this.state = State.FAILED;
-                        this.errorExposed = true;
-                        var recordFuture = this.recordFuture;
-                        this.recordFuture = null;
-                        recordFuture.completeExceptionally(error);
-                    }
+                                    recordFuture.completeExceptionally(error);
+                                }
+                            });
                 } else {
                     secondRecordFuture = this.secondRecordFuture;
                     this.secondRecordFuture = null;
@@ -882,66 +809,46 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                         state = State.READY;
                     } else {
                         if (this.recordsFuture != null) {
-                            var term = termSupplier.get();
-                            if (term == null) {
-                                // list is pending, stream all
-                                state = State.STREAMING;
-                                updateRecordState(RecordState.NO_RECORD);
-                                boltConnection
-                                        .pull(runSummary.queryId(), -1)
-                                        .thenCompose(conn -> conn.flush(this))
-                                        .whenComplete((ignored, throwable) -> {
-                                            var error = Futures.completionExceptionCause(throwable);
-                                            if (error != null) {
-                                                CompletableFuture<List<Record>> recordsFuture;
-                                                synchronized (this) {
-                                                    state = State.FAILED;
-                                                    errorExposed = true;
-                                                    recordsFuture = this.recordsFuture;
-                                                    this.recordsFuture = null;
-                                                    apiCallInProgress = false;
-                                                }
-                                                recordsFuture.completeExceptionally(error);
+                            // list is pending, stream all
+                            state = State.STREAMING;
+                            updateRecordState(RecordState.NO_RECORD);
+                            boltConnection
+                                    .pull(runSummary.queryId(), -1)
+                                    .thenCompose(conn -> conn.flush(this))
+                                    .whenComplete((ignored, throwable) -> {
+                                        var error = Futures.completionExceptionCause(throwable);
+                                        if (error != null) {
+                                            CompletableFuture<List<Record>> recordsFuture;
+                                            synchronized (this) {
+                                                state = State.FAILED;
+                                                errorExposed = true;
+                                                recordsFuture = this.recordsFuture;
+                                                this.recordsFuture = null;
+                                                apiCallInProgress = false;
                                             }
-                                        });
-                            } else {
-                                this.error = term;
-                                this.state = State.FAILED;
-                                this.errorExposed = true;
-                                var recordsFuture = this.recordsFuture;
-                                this.recordsFuture = null;
-                                recordsFuture.completeExceptionally(error);
-                            }
+                                            recordsFuture.completeExceptionally(error);
+                                        }
+                                    });
                         } else if (this.summaryFuture != null) {
-                            var term = termSupplier.get();
-                            if (term == null) {
-                                // consume is pending, discard all
-                                state = State.DISCARDING;
-                                boltConnection
-                                        .discard(runSummary.queryId(), -1)
-                                        .thenCompose(conn -> conn.flush(this))
-                                        .whenComplete((ignored, throwable) -> {
-                                            var error = Futures.completionExceptionCause(throwable);
-                                            CompletableFuture<ResultSummary> summaryFuture;
-                                            if (error != null) {
-                                                synchronized (this) {
-                                                    state = State.FAILED;
-                                                    errorExposed = true;
-                                                    summaryFuture = this.summaryFuture;
-                                                    this.summaryFuture = null;
-                                                    apiCallInProgress = false;
-                                                }
-                                                summaryFuture.completeExceptionally(error);
+                            // consume is pending, discard all
+                            state = State.DISCARDING;
+                            boltConnection
+                                    .discard(runSummary.queryId(), -1)
+                                    .thenCompose(conn -> conn.flush(this))
+                                    .whenComplete((ignored, throwable) -> {
+                                        var error = Futures.completionExceptionCause(throwable);
+                                        CompletableFuture<ResultSummary> summaryFuture;
+                                        if (error != null) {
+                                            synchronized (this) {
+                                                state = State.FAILED;
+                                                errorExposed = true;
+                                                summaryFuture = this.summaryFuture;
+                                                this.summaryFuture = null;
+                                                apiCallInProgress = false;
                                             }
-                                        });
-                            } else {
-                                this.error = term;
-                                this.state = State.FAILED;
-                                this.errorExposed = true;
-                                var summaryFuture = this.recordsFuture;
-                                this.summaryFuture = null;
-                                summaryFuture.completeExceptionally(error);
-                            }
+                                            summaryFuture.completeExceptionally(error);
+                                        }
+                                    });
                         } else {
                             state = State.READY;
                         }
@@ -1057,9 +964,6 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                 }
             }
 
-            if (throwableConsumer != null && error != null) {
-                throwableConsumer.accept(error);
-            }
             if (closeOnSummary) {
                 var errorSnapshot = error;
                 var recordFutureSnapshot = recordFuture;
@@ -1140,12 +1044,9 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             if (beginFuture != null) {
                 if (!beginFuture.isDone()) {
                     // not exposed yet, fail
-                    if (throwableConsumer != null) {
-                        throwableConsumer.accept(throwable);
-                    }
                     if (closeOnSummary) {
                         boltConnection.close().whenComplete((ignored, closeThrowable) -> {
-                            if (closeThrowable != null) {
+                            if (closeThrowable != null && throwable != closeThrowable) {
                                 throwable.addSuppressed(closeThrowable);
                             }
                             beginFuture.completeExceptionally(throwable);
@@ -1173,12 +1074,9 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
 
                 if (!resultCursorFuture.isDone()) {
                     // not exposed yet, fail
-                    if (throwableConsumer != null) {
-                        throwableConsumer.accept(throwable);
-                    }
                     if (closeOnSummary) {
                         finisher = () -> boltConnection.close().whenComplete((ignored, closeThrowable) -> {
-                            if (closeThrowable != null) {
+                            if (closeThrowable != null && throwable != closeThrowable) {
                                 throwable.addSuppressed(closeThrowable);
                             }
                             resultCursorFuture.completeExceptionally(throwable);
@@ -1225,16 +1123,13 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
                             }
                         }
                     }
-                    if (throwableConsumer != null) {
-                        throwableConsumer.accept(throwable);
-                    }
                     var recordFutureSnapshot = recordFuture;
                     var secondRecordFutureSnapshot = secondRecordFuture;
                     var recordsFutureSnapshot = recordsFuture;
                     var summaryFutureSnapshot = summaryFuture;
                     if (closeOnSummary) {
                         finisher = () -> boltConnection.close().whenComplete((ignored, closeThrowable) -> {
-                            if (closeThrowable != null) {
+                            if (closeThrowable != null && throwable != closeThrowable) {
                                 throwable.addSuppressed(closeThrowable);
                             }
                             if (peekFuture != null) {
@@ -1300,65 +1195,41 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             }
             return switch (state) {
                 case READY -> {
-                    var term = termSupplier.get();
-                    if (term == null) {
-                        apiCallInProgress = true;
-                        summaryFuture = new CompletableFuture<>();
-                        state = State.STREAMING;
-                        updateRecordState(RecordState.NO_RECORD);
-                        boltConnection
-                                .pull(runSummary.queryId(), -1)
-                                .thenCompose(conn -> conn.flush(this))
-                                .whenComplete((ignored, throwable) -> {
-                                    var error = Futures.completionExceptionCause(throwable);
-                                    CompletableFuture<ResultSummary> summaryFuture;
-                                    if (error != null) {
-                                        synchronized (this) {
-                                            state = State.FAILED;
-                                            errorExposed = true;
-                                            summaryFuture = this.summaryFuture;
-                                            this.summaryFuture = null;
-                                            apiCallInProgress = false;
-                                        }
-                                        summaryFuture.completeExceptionally(error);
+                    apiCallInProgress = true;
+                    summaryFuture = new CompletableFuture<>();
+                    state = State.STREAMING;
+                    updateRecordState(RecordState.NO_RECORD);
+                    boltConnection
+                            .pull(runSummary.queryId(), -1)
+                            .thenCompose(conn -> conn.flush(this))
+                            .whenComplete((ignored, throwable) -> {
+                                var error = Futures.completionExceptionCause(throwable);
+                                CompletableFuture<ResultSummary> summaryFuture;
+                                if (error != null) {
+                                    synchronized (this) {
+                                        state = State.FAILED;
+                                        errorExposed = true;
+                                        summaryFuture = this.summaryFuture;
+                                        this.summaryFuture = null;
+                                        apiCallInProgress = false;
                                     }
-                                });
-                        yield summaryFuture.handle((ignored, throwable) -> throwable);
-                    } else {
-                        this.error = term;
-                        this.state = State.FAILED;
-                        this.errorExposed = true;
-                        yield CompletableFuture.failedStage(error);
-                    }
+                                    summaryFuture.completeExceptionally(error);
+                                }
+                            });
+                    yield summaryFuture.handle((ignored, throwable) -> throwable);
                 }
                 case STREAMING -> {
-                    var term = termSupplier.get();
-                    if (term == null) {
-                        apiCallInProgress = true;
-                        // no pending request should be in place
-                        recordsFuture = new CompletableFuture<>();
-                        keepRecords = true;
-                        yield recordsFuture.handle((ignored, throwable) -> throwable);
-                    } else {
-                        this.error = term;
-                        this.state = State.FAILED;
-                        this.errorExposed = true;
-                        yield CompletableFuture.failedStage(error);
-                    }
+                    apiCallInProgress = true;
+                    // no pending request should be in place
+                    recordsFuture = new CompletableFuture<>();
+                    keepRecords = true;
+                    yield recordsFuture.handle((ignored, throwable) -> throwable);
                 }
                 case DISCARDING -> {
-                    var term = termSupplier.get();
-                    if (term == null) {
-                        apiCallInProgress = true;
-                        // no pending request should be in place
-                        summaryFuture = new CompletableFuture<>();
-                        yield summaryFuture.handle((ignored, throwable) -> throwable);
-                    } else {
-                        this.error = term;
-                        this.state = State.FAILED;
-                        this.errorExposed = true;
-                        yield CompletableFuture.failedStage(error);
-                    }
+                    apiCallInProgress = true;
+                    // no pending request should be in place
+                    summaryFuture = new CompletableFuture<>();
+                    yield summaryFuture.handle((ignored, throwable) -> throwable);
                 }
                 case FAILED -> stageExposingError(null).handle((ignored, throwable) -> throwable);
                 case SUCCEEDED -> CompletableFuture.completedStage(null);

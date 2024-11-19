@@ -93,6 +93,7 @@ class LeakLoggingNetworkSessionTest {
         var log = mock(Logger.class);
         when(logging.getLog(any(Class.class))).thenReturn(log);
         var connection = TestUtil.connectionMock();
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         setupConnectionAnswers(connection, List.of(handler -> {

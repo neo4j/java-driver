@@ -88,6 +88,7 @@ class NetworkSessionTest {
     @BeforeEach
     void setUp() {
         connection = connectionMock(new BoltProtocolVersion(5, 4));
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.close()).willReturn(completedFuture(null));
         connectionProvider = mock(BoltConnectionProvider.class);
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
@@ -308,6 +309,7 @@ class NetworkSessionTest {
 
     @Test
     void releasesConnectionWhenTxIsClosed() {
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
         given(connection.run(any(), any())).willAnswer((Answer<CompletionStage<BoltConnection>>)
@@ -529,9 +531,11 @@ class NetworkSessionTest {
     void shouldBeginTxAfterBeginTxFailureOnBookmark() {
         var error = new RuntimeException("Hi");
         var connection1 = connectionMock(new BoltProtocolVersion(5, 0));
+        given(connection1.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection1.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.failedStage(error));
         var connection2 = connectionMock(new BoltProtocolVersion(5, 0));
+        given(connection2.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection2.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection2));
         setupConnectionAnswers(connection2, List.of(handler -> {

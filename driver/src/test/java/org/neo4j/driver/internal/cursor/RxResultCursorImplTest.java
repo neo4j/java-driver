@@ -17,17 +17,21 @@
 package org.neo4j.driver.internal.cursor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.MockitoAnnotations.openMocks;
 
 import java.util.List;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.neo4j.driver.Logging;
 import org.neo4j.driver.Query;
@@ -35,6 +39,7 @@ import org.neo4j.driver.Record;
 import org.neo4j.driver.internal.DatabaseBookmark;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
+import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 
 class RxResultCursorImplTest {
@@ -50,12 +55,6 @@ class RxResultCursorImplTest {
     @Mock
     Consumer<DatabaseBookmark> bookmarkConsumer;
 
-    @Mock
-    Consumer<Throwable> throwableConsumer;
-
-    @Mock
-    Supplier<Throwable> termSupplier;
-
     @BeforeEach
     @SuppressWarnings("resource")
     void beforeEach() {
@@ -63,54 +62,44 @@ class RxResultCursorImplTest {
         given(connection.protocolVersion()).willReturn(new BoltProtocolVersion(5, 5));
     }
 
-    @Test
-    void shouldNotifyRecordConsumerOfRunError() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldNotifyRecordConsumerOfRunError(boolean getRunError) {
         // given
         var runError = mock(Throwable.class);
-        var cursor = new RxResultCursorImpl(
-                connection,
-                query,
-                null,
-                runError,
-                bookmarkConsumer,
-                throwableConsumer,
-                false,
-                termSupplier,
-                Logging.none());
+        given(connection.serverAddress()).willReturn(new BoltServerAddress("localhost"));
+        var cursor = new RxResultCursorImpl(connection, query, null, runError, bookmarkConsumer, false, Logging.none());
+        if (getRunError) {
+            assertEquals(runError, cursor.getRunError());
+        }
         @SuppressWarnings("unchecked")
         BiConsumer<Record, Throwable> recordConsumer = mock(BiConsumer.class);
-        cursor.installRecordConsumer(recordConsumer);
 
         // when
-        cursor.request(1);
+        cursor.installRecordConsumer(recordConsumer);
 
         // then
         then(recordConsumer).should().accept(null, runError);
+        assertNotNull(cursor.summaryAsync().toCompletableFuture().join());
     }
 
-    @Test
-    void shouldNotNotifyRecordConsumerOfRunErrorWhenRunErrorIsRequested() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldReturnSummaryWithRunError(boolean getRunError) {
         // given
         var runError = mock(Throwable.class);
-        var cursor = new RxResultCursorImpl(
-                connection,
-                query,
-                runSummary,
-                runError,
-                bookmarkConsumer,
-                throwableConsumer,
-                false,
-                termSupplier,
-                Logging.none());
-        @SuppressWarnings("unchecked")
-        BiConsumer<Record, Throwable> recordConsumer = mock(BiConsumer.class);
-        assertEquals(runError, cursor.getRunError());
+        given(connection.serverAddress()).willReturn(new BoltServerAddress("localhost"));
+        var cursor = new RxResultCursorImpl(connection, query, null, runError, bookmarkConsumer, false, Logging.none());
+        if (getRunError) {
+            assertEquals(runError, cursor.getRunError());
+        }
 
         // when
-        cursor.installRecordConsumer(recordConsumer);
+        var summary = cursor.summaryAsync().toCompletableFuture();
 
         // then
-        then(recordConsumer).shouldHaveNoInteractions();
+        assertEquals(
+                runError, assertThrows(CompletionException.class, summary::join).getCause());
     }
 
     @Test
@@ -118,16 +107,8 @@ class RxResultCursorImplTest {
         // given
         var keys = List.of("a", "b");
         given(runSummary.keys()).willReturn(keys);
-        var cursor = new RxResultCursorImpl(
-                connection,
-                query,
-                runSummary,
-                null,
-                bookmarkConsumer,
-                throwableConsumer,
-                false,
-                termSupplier,
-                Logging.none());
+        var cursor =
+                new RxResultCursorImpl(connection, query, runSummary, null, bookmarkConsumer, false, Logging.none());
 
         // when & then
         assertEquals(keys, cursor.keys());

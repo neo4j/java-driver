@@ -57,7 +57,6 @@ public final class BasicResponseHandler implements ResponseHandler {
         return summariesFuture;
     }
 
-    @SuppressWarnings("DuplicatedCode")
     @Override
     public void onError(Throwable throwable) {
         if (throwable instanceof CompletionException) {
@@ -68,10 +67,7 @@ public final class BasicResponseHandler implements ResponseHandler {
         } else {
             if (error instanceof Neo4jException && !(throwable instanceof Neo4jException)) {
                 // higher order error has occurred
-                throwable.addSuppressed(error);
                 error = throwable;
-            } else {
-                error.addSuppressed(throwable);
             }
         }
     }

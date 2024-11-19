@@ -23,6 +23,8 @@ import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
 
 public interface BoltConnection {
+    CompletionStage<BoltConnection> onLoop();
+
     CompletionStage<BoltConnection> route(DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks);
 
     CompletionStage<BoltConnection> beginTransaction(

@@ -17,6 +17,7 @@
 package org.neo4j.driver.internal.cursor;
 
 import static org.neo4j.driver.internal.types.InternalTypeSystem.TYPE_SYSTEM;
+import static org.neo4j.driver.internal.util.ErrorUtil.newResultConsumedError;
 
 import java.util.Collections;
 import java.util.List;
@@ -27,7 +28,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import org.neo4j.driver.Bookmark;
 import org.neo4j.driver.Logger;
 import org.neo4j.driver.Logging;
@@ -48,6 +48,7 @@ import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.util.Futures;
 import org.neo4j.driver.internal.util.MetadataExtractor;
+import org.neo4j.driver.summary.GqlStatusObject;
 import org.neo4j.driver.summary.ResultSummary;
 
 public class RxResultCursorImpl extends AbstractRecordStateResponseHandler implements RxResultCursor, ResponseHandler {
@@ -77,36 +78,26 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
             return -1;
         }
     };
-
     private final Logger log;
     private final BoltConnection boltConnection;
     private final Query query;
     private final RunSummary runSummary;
     private final Throwable runError;
     private final Consumer<DatabaseBookmark> bookmarkConsumer;
-    private final Consumer<Throwable> throwableConsumer;
-    private final Supplier<Throwable> interruptSupplier;
     private final boolean closeOnSummary;
-
     private final CompletableFuture<ResultSummary> summaryFuture = new CompletableFuture<>();
     private final CompletableFuture<Void> consumedFuture = new CompletableFuture<>();
     private final boolean legacyNotifications;
-
-    private State state;
+    private State state = State.READY;
     private boolean discardPending;
     private boolean runErrorExposed;
     private boolean summaryExposed;
-
     // subscription
     private BiConsumer<Record, Throwable> recordConsumer;
     private long outstandingDemand;
-    private boolean recordConsumerFinished;
-    private boolean recordConsumerHadRequests;
-
     private PullSummary pullSummary;
     private DiscardSummary discardSummary;
     private Throwable error;
-    private boolean interrupted;
 
     private enum State {
         READY,
@@ -122,36 +113,22 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
             RunSummary runSummary,
             Throwable runError,
             Consumer<DatabaseBookmark> bookmarkConsumer,
-            Consumer<Throwable> throwableConsumer,
             boolean closeOnSummary,
-            Supplier<Throwable> interruptSupplier,
             Logging logging) {
         this.boltConnection = boltConnection;
         this.legacyNotifications = new BoltProtocolVersion(5, 5).compareTo(boltConnection.protocolVersion()) > 0;
         this.query = query;
-        if (runError == null) {
-            this.runSummary = runSummary;
-            this.state = State.READY;
-        } else {
-            this.runSummary = EMPTY_RUN_SUMMARY;
-            this.state = State.FAILED;
-            this.summaryFuture.completeExceptionally(runError);
-        }
+        this.runSummary = runError == null ? runSummary : EMPTY_RUN_SUMMARY;
         this.runError = runError;
         this.bookmarkConsumer = bookmarkConsumer;
         this.closeOnSummary = closeOnSummary;
-        this.throwableConsumer = throwableConsumer;
-        this.interruptSupplier = interruptSupplier;
         this.log = logging.getLog(getClass());
-
-        var runErrorName = runError == null ? "null" : runError.getClass().getCanonicalName();
-        log.trace("[%d] New instance (runError=%s)", hashCode(), runErrorName);
+        log.trace("[%d] New instance (runError=%s)", hashCode(), throwableName(runError));
     }
 
     @Override
     public synchronized Throwable getRunError() {
-        var name = runError == null ? "null" : runError.getClass().getCanonicalName();
-        log.trace("[%d] Run error explicitly retrieved (value=%s)", hashCode(), name);
+        log.trace("[%d] Run error explicitly retrieved (value=%s)", hashCode(), throwableName(runError));
         runErrorExposed = true;
         return runError;
     }
@@ -167,40 +144,24 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
     }
 
     @Override
-    public synchronized boolean isDone() {
-        return switch (state) {
-            case DISCARDING, STREAMING, READY -> false;
-            case FAILED -> runError == null || runErrorExposed;
-            case SUCCEEDED -> true;
-        };
+    public boolean isDone() {
+        return summaryFuture.isDone();
     }
 
     @Override
     public void installRecordConsumer(BiConsumer<Record, Throwable> recordConsumer) {
         Objects.requireNonNull(recordConsumer);
+        if (summaryExposed) {
+            throw newResultConsumedError();
+        }
         var runnable = NOOP_RUNNABLE;
         synchronized (this) {
             if (this.recordConsumer == null) {
-                this.recordConsumer = (record, throwable) -> {
-                    var recordHash = record == null ? "null" : record.hashCode();
-                    var throwableName =
-                            throwable == null ? "null" : throwable.getClass().getCanonicalName();
-                    try {
-                        recordConsumer.accept(record, throwable);
-                        log.trace(
-                                "[%d] Record consumer notified with (record=%s, throwable=%s)",
-                                hashCode(), recordHash, throwableName);
-                    } catch (Throwable unexpectedThrowable) {
-                        log.error(
-                                String.format(
-                                        "[%d] Record consumer threw an error when notified with (record=%s, throwable=%s), this will be ignored",
-                                        hashCode(), recordHash, throwableName),
-                                unexpectedThrowable);
-                    }
-                };
+                this.recordConsumer = safeRecordConsumer(recordConsumer);
                 log.trace("[%d] Record consumer installed", hashCode());
-                if (runError != null && !runErrorExposed) {
-                    runnable = setupRecordConsumerErrorNotificationRunnable(runError, true);
+                if (runError != null) {
+                    handleError(runError);
+                    runnable = this::onComplete;
                 }
             } else {
                 log.warn("[%d] Only one record consumer is supported, this request will be ignored", hashCode());
@@ -214,42 +175,30 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
         if (n > 0) {
             var runnable = NOOP_RUNNABLE;
             synchronized (this) {
-                if (recordConsumerFinished) {
-                    log.trace(
-                            "[%d] Tried requesting more records after record consumer is finished, this request will be ignored",
-                            hashCode());
-                    return;
-                }
-                recordConsumerHadRequests = true;
                 updateRecordState(RecordState.NO_RECORD);
                 log.trace("[%d] %d records requested in %s state", hashCode(), n, state);
                 switch (state) {
-                    case READY -> runnable = executeIfNotInterrupted(() -> {
+                    case READY -> {
                         var request = appendDemand(n);
                         state = State.STREAMING;
-                        return () -> boltConnection
+                        runnable = () -> boltConnection
                                 .pull(runSummary.queryId(), request)
                                 .thenCompose(conn -> conn.flush(this))
                                 .whenComplete((ignored, throwable) -> {
                                     throwable = Futures.completionExceptionCause(throwable);
                                     if (throwable != null) {
-                                        handleError(throwable, false);
+                                        handleError(throwable);
                                         onComplete();
                                     }
                                 });
-                    });
+                    }
                     case STREAMING -> appendDemand(n);
-                    case FAILED -> runnable = runError != null
-                            ? setupRecordConsumerErrorNotificationRunnable(runError, true)
-                            : error != null
-                                    ? setupRecordConsumerErrorNotificationRunnable(error, false)
-                                    : NOOP_RUNNABLE;
-                    case DISCARDING, SUCCEEDED -> {}
+                    case FAILED, DISCARDING, SUCCEEDED -> {}
                 }
             }
             runnable.run();
         } else {
-            log.warn("[%d] %d records requested, negative amounts will be ignored", hashCode(), n);
+            log.warn("[%d] %d records requested, negative amounts are ignored", hashCode(), n);
         }
     }
 
@@ -259,7 +208,7 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
         synchronized (this) {
             log.trace("[%d] Cancellation requested in %s state", hashCode(), state);
             switch (state) {
-                case READY -> runnable = executeIfNotInterrupted(this::setupDiscardRunnable);
+                case READY -> runnable = setupDiscardRunnable();
                 case STREAMING -> discardPending = true;
                 case DISCARDING, FAILED, SUCCEEDED -> {}
             }
@@ -278,7 +227,14 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
             summaryExposed = true;
             switch (state) {
                 case SUCCEEDED, FAILED, DISCARDING -> {}
-                case READY -> runnable = executeIfNotInterrupted(this::setupDiscardRunnable);
+                case READY -> {
+                    if (runError != null && recordConsumer == null) {
+                        handleError(runError);
+                        runnable = this::onComplete;
+                    } else {
+                        runnable = setupDiscardRunnable();
+                    }
+                }
                 case STREAMING -> discardPending = true;
             }
         }
@@ -337,15 +293,9 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
         Runnable runnable;
         synchronized (this) {
             log.trace("[%d] onComplete", hashCode());
-            var throwable = interruptSupplier.get();
-            if (throwable != null) {
-                handleError(throwable, true);
-            } else {
-                throwable = error;
-            }
 
-            if (throwable != null) {
-                runnable = setupCompletionRunnableWithError(throwable);
+            if (error != null) {
+                runnable = setupCompletionRunnableWithError(error);
             } else if (pullSummary != null) {
                 runnable = setupCompletionRunnableWithPullSummary();
             } else if (discardSummary != null) {
@@ -359,20 +309,14 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
 
     @Override
     public synchronized void onError(Throwable throwable) {
-        if (log.isTraceEnabled()) {
-            log.error(String.format("[%d] onError", hashCode()), throwable);
-        }
-        handleError(throwable, false);
+        log.trace("[%d] onError", hashCode());
+        handleError(throwable);
     }
 
     @Override
     public synchronized void onIgnored() {
         log.trace("[%d] onIgnored", hashCode());
-        var throwable = interruptSupplier.get();
-        if (throwable == null) {
-            throwable = IGNORED_ERROR;
-        }
-        onError(throwable);
+        handleError(IGNORED_ERROR);
     }
 
     @Override
@@ -411,7 +355,12 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
     @Override
     public synchronized CompletionStage<Throwable> pullAllFailureAsync() {
         log.trace("[%d] Pull all failure requested", hashCode());
-        if (recordConsumer != null && !isDone()) {
+        var unfinishedState =
+                switch (state) {
+                    case READY, STREAMING, DISCARDING -> true;
+                    case FAILED, SUCCEEDED -> false;
+                };
+        if (recordConsumer != null && unfinishedState) {
             return CompletableFuture.completedFuture(
                     new TransactionNestingException(
                             "You cannot run another query or begin a new transaction in the same session before you've fully consumed the previous run result."));
@@ -453,49 +402,14 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
                 .whenComplete((ignored, throwable) -> {
                     throwable = Futures.completionExceptionCause(throwable);
                     if (throwable != null) {
-                        handleError(throwable, false);
+                        handleError(throwable);
                         onComplete();
                     }
                 });
     }
 
-    private synchronized Runnable executeIfNotInterrupted(Supplier<Runnable> runnableSupplier) {
-        var runnable = NOOP_RUNNABLE;
-        var throwable = interruptSupplier.get();
-        if (throwable == null) {
-            runnable = runnableSupplier.get();
-        } else {
-            log.trace("[%d] Interrupt signal detected upon handling request", hashCode());
-            handleError(throwable, true);
-            runnable = this::onComplete;
-        }
-        return runnable;
-    }
-
-    private synchronized Runnable setupRecordConsumerErrorNotificationRunnable(Throwable throwable, boolean runError) {
-        Runnable runnable;
-        if (recordConsumer != null) {
-            if (!recordConsumerFinished) {
-                if (runError) {
-                    this.runErrorExposed = true;
-                }
-                recordConsumerFinished = true;
-                var recordConsumerRef = recordConsumer;
-                recordConsumer = NOOP_CONSUMER;
-                runnable = () -> recordConsumerRef.accept(null, throwable);
-            } else {
-                runnable = () ->
-                        log.trace("[%d] Record consumer will not be notified as it has been finished", hashCode());
-            }
-        } else {
-            runnable = () ->
-                    log.trace("[%d] Record consumer will not be notified as it has not been installed", hashCode());
-        }
-        return runnable;
-    }
-
     private synchronized Runnable setupCompletionRunnableWithPullSummary() {
-        log.trace("[%d] Setting up completion with pull summary", hashCode());
+        log.trace("[%d] Setting up completion with pull summary (hasMore=%b)", hashCode(), pullSummary.hasMore());
         var runnable = NOOP_RUNNABLE;
         if (pullSummary.hasMore()) {
             pullSummary = null;
@@ -508,7 +422,7 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
                         .whenComplete((ignored, flushThrowable) -> {
                             var error = Futures.completionExceptionCause(flushThrowable);
                             if (error != null) {
-                                handleError(error, false);
+                                handleError(error);
                                 onComplete();
                             }
                         });
@@ -522,7 +436,7 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
                             .whenComplete((ignored, flushThrowable) -> {
                                 var error = Futures.completionExceptionCause(flushThrowable);
                                 if (error != null) {
-                                    handleError(error, false);
+                                    handleError(error);
                                     onComplete();
                                 }
                             });
@@ -541,67 +455,31 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
         var runnable = NOOP_RUNNABLE;
         ResultSummary resultSummary = null;
         try {
-            resultSummary = resultSummary(metadata);
+            resultSummary = resultSummary(metadata, generateGqlStatusObject(runSummary.keys()));
             state = State.SUCCEEDED;
         } catch (Throwable summaryThrowable) {
-            handleError(summaryThrowable, false);
+            handleError(summaryThrowable);
         }
 
         if (resultSummary != null) {
             var bookmarkOpt = databaseBookmark(metadata);
-            var recordConsumerFinished = this.recordConsumerFinished;
-            this.recordConsumerFinished = true;
-            var recordConsumerRef = recordConsumer;
-            this.recordConsumer = NOOP_CONSUMER;
-            var recordConsumerHadRequests = this.recordConsumerHadRequests;
-            var resultSummaryRef = resultSummary;
-
-            runnable = () -> {
-                bookmarkOpt.ifPresent(bookmarkConsumer);
-                var closeStage = closeOnSummary ? boltConnection.close() : CompletableFuture.completedStage(null);
-                closeStage.whenComplete((ignored, closeThrowable) -> {
-                    var error = Futures.completionExceptionCause(closeThrowable);
-                    if (error != null) {
-                        if (log.isTraceEnabled()) {
-                            log.error(
-                                    String.format(
-                                            "[%d] Failed to close connection while publishing summary", hashCode()),
-                                    error);
-                        }
-                    }
-                    if (recordConsumerFinished) {
-                        log.trace("[%d] Won't publish summary because recordConsumer is finished", hashCode());
-                    } else {
-                        if (recordConsumerRef != null) {
-                            if (recordConsumerHadRequests) {
-                                recordConsumerRef.accept(null, null);
-                            } else {
-                                log.trace(
-                                        "[%d] Record consumer will not be notified as it had no requests", hashCode());
-                            }
-                        } else {
-                            log.trace(
-                                    "[%d] Record consumer will not be notified as it has not been installed",
-                                    hashCode());
-                        }
-                    }
-                    completeSummaryFuture(resultSummaryRef, null);
-                });
-            };
+            bookmarkOpt.ifPresent(bookmarkConsumer);
+            var completeRunnable = setupSummaryAndRecordCompletionRunnable(resultSummary, null);
+            runnable = () -> closeBoltConnection(completeRunnable);
         } else {
             runnable = this::onComplete;
         }
         return runnable;
     }
 
-    private ResultSummary resultSummary(Map<String, Value> metadata) {
+    private ResultSummary resultSummary(Map<String, Value> metadata, GqlStatusObject gqlStatusObject) {
         return METADATA_EXTRACTOR.extractSummary(
                 query,
                 boltConnection,
                 runSummary.resultAvailableAfter(),
                 metadata,
                 legacyNotifications,
-                generateGqlStatusObject(runSummary.keys()));
+                gqlStatusObject);
     }
 
     @SuppressWarnings("DuplicatedCode")
@@ -618,81 +496,74 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
     }
 
     private synchronized Runnable setupCompletionRunnableWithError(Throwable throwable) {
-        log.trace(
-                "[%d] Setting up completion with error %s",
-                hashCode(), throwable.getClass().getCanonicalName());
-        var recordConsumerPresent = this.recordConsumer != null;
-        var recordConsumerFinished = this.recordConsumerFinished;
-        var recordConsumerErrorNotificationRunnable = setupRecordConsumerErrorNotificationRunnable(throwable, false);
-        var interrupted = this.interrupted;
-        return () -> {
-            ResultSummary summary = null;
-            try {
-                summary = resultSummary(Collections.emptyMap());
-            } catch (Throwable summaryThrowable) {
-                if (!interrupted) {
-                    throwable.addSuppressed(summaryThrowable);
-                }
-            }
-
-            if (summary != null && recordConsumerPresent && !recordConsumerFinished) {
-                var summaryRef = summary;
-                closeBoltConnection(throwable, interrupted, () -> {
-                    // notify recordConsumer when possible
-                    recordConsumerErrorNotificationRunnable.run();
-                    completeSummaryFuture(summaryRef, null);
-                });
-            } else {
-                closeBoltConnection(throwable, interrupted, () -> completeSummaryFuture(null, throwable));
-            }
-        };
+        log.trace("[%d] Setting up completion with error %s", hashCode(), throwableName(throwable));
+        ResultSummary summary = null;
+        try {
+            summary = resultSummary(Collections.emptyMap(), null);
+        } catch (Throwable summaryThrowable) {
+            log.error(String.format("[%d] Failed to parse summary", hashCode()), summaryThrowable);
+        }
+        var completeRunnable = setupSummaryAndRecordCompletionRunnable(summary, throwable);
+        return () -> closeBoltConnection(completeRunnable);
     }
 
-    private void closeBoltConnection(Throwable throwable, boolean interrupted, Runnable runnable) {
+    private void closeBoltConnection(Runnable runnable) {
         var closeStage = closeOnSummary ? boltConnection.close() : CompletableFuture.completedStage(null);
         closeStage.whenComplete((ignored, closeThrowable) -> {
-            var error = Futures.completionExceptionCause(closeThrowable);
-            if (!interrupted) {
-                if (error != null) {
-                    throwable.addSuppressed(error);
-                }
-                throwableConsumer.accept(throwable);
+            if (log.isTraceEnabled() && closeThrowable != null) {
+                log.error(
+                        String.format("[%d] Failed to close connection", hashCode()),
+                        Futures.completionExceptionCause(closeThrowable));
             }
             runnable.run();
         });
     }
 
-    private synchronized void handleError(Throwable throwable, boolean interrupted) {
+    @SuppressWarnings("DuplicatedCode")
+    private synchronized void handleError(Throwable throwable) {
+        if (log.isTraceEnabled()) {
+            log.error(String.format("[%d] handleError", hashCode()), throwable);
+        }
         state = State.FAILED;
         throwable = Futures.completionExceptionCause(throwable);
         if (error == null) {
             error = throwable;
-            this.interrupted = interrupted;
         } else {
-            if (!this.interrupted) {
-                if (throwable == IGNORED_ERROR) {
-                    return;
-                }
-                if (interrupted) {
-                    error = throwable;
-                    this.interrupted = true;
-                } else {
-                    if (error instanceof Neo4jException && !(throwable instanceof Neo4jException)) {
-                        // higher order error has occurred
-                        if (error != IGNORED_ERROR) {
-                            throwable.addSuppressed(error);
-                        }
-                        error = throwable;
-                    } else {
-                        error.addSuppressed(throwable);
-                    }
-                }
+            if (throwable == IGNORED_ERROR) {
+                return;
+            }
+            if (error == IGNORED_ERROR || (error instanceof Neo4jException && !(throwable instanceof Neo4jException))) {
+                error = throwable;
             }
         }
     }
 
+    private synchronized Runnable setupSummaryAndRecordCompletionRunnable(ResultSummary summary, Throwable throwable) {
+        var recordConsumerRef = recordConsumer;
+        this.recordConsumer = NOOP_CONSUMER;
+
+        return () -> {
+            if (throwable != null) {
+                if (recordConsumerRef != null && recordConsumerRef != NOOP_CONSUMER) {
+                    completeSummaryFuture(summary, null);
+                    recordConsumerRef.accept(null, throwable);
+                } else {
+                    completeSummaryFuture(null, throwable);
+                }
+            } else {
+                completeSummaryFuture(summary, null);
+                if (recordConsumerRef != null) {
+                    recordConsumerRef.accept(null, null);
+                }
+            }
+        };
+    }
+
     private void completeSummaryFuture(ResultSummary summary, Throwable throwable) {
         throwable = Futures.completionExceptionCause(throwable);
+        log.trace(
+                "[%d] Completing summary future (summary=%s, throwable=%s)",
+                hashCode(), hash(summary), throwableName(throwable));
         if (throwable != null) {
             consumedFuture.completeExceptionally(throwable);
             summaryFuture.completeExceptionally(throwable);
@@ -700,5 +571,30 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
             consumedFuture.complete(null);
             summaryFuture.complete(summary);
         }
+    }
+
+    private BiConsumer<Record, Throwable> safeRecordConsumer(BiConsumer<Record, Throwable> recordConsumer) {
+        return (record, throwable) -> {
+            try {
+                recordConsumer.accept(record, throwable);
+                log.trace(
+                        "[%d] Record consumer notified with (record=%s, throwable=%s)",
+                        hashCode(), hash(record), throwableName(throwable));
+            } catch (Throwable unexpectedThrowable) {
+                log.error(
+                        String.format(
+                                "[%d] Record consumer threw an error when notified with (record=%s, throwable=%s), this will be ignored",
+                                hashCode(), hash(record), throwableName(throwable)),
+                        unexpectedThrowable);
+            }
+        };
+    }
+
+    private String hash(Object object) {
+        return object == null ? "null" : String.valueOf(object.hashCode());
+    }
+
+    private String throwableName(Throwable throwable) {
+        return throwable == null ? "null" : throwable.getClass().getCanonicalName();
     }
 }

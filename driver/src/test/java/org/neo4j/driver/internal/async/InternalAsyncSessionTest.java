@@ -97,6 +97,7 @@ class InternalAsyncSessionTest {
     @BeforeEach
     void setUp() {
         connection = connectionMock(new BoltProtocolVersion(4, 0));
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.close()).willReturn(completedFuture(null));
         connectionProvider = mock(BoltConnectionProvider.class);
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))

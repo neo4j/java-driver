@@ -73,6 +73,7 @@ class InternalAsyncTransactionTest {
     @BeforeEach
     void setUp() {
         connection = connectionMock(BoltProtocolV4.INSTANCE.version());
+        given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         var connectionProvider = mock(BoltConnectionProvider.class);
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willAnswer((Answer<CompletionStage<BoltConnection>>) invocation -> {

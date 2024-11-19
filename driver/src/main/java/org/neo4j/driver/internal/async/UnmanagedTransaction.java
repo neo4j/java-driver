@@ -27,14 +27,12 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.neo4j.driver.Bookmark;
 import org.neo4j.driver.Logging;
@@ -155,7 +153,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
             ApiTelemetryWork apiTelemetryWork,
             Logging logging) {
         this.logging = logging;
-        this.connection = new TerminationAwareBoltConnection(connection, this);
+        this.connection = new TerminationAwareBoltConnection(logging, connection, this, this::markTerminated);
         this.databaseName = databaseName;
         this.accessMode = accessMode;
         this.impersonatedUser = impersonatedUser;
@@ -186,15 +184,14 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                         notificationConfig))
                 .thenCompose(connection -> {
                     if (flush) {
-                        var responseHandler = new BeginResponseHandler(
-                                apiTelemetryWork, () -> executeWithLock(lock, () -> causeOfTermination));
+                        var responseHandler = new BeginResponseHandler(apiTelemetryWork);
                         connection
                                 .flush(responseHandler)
                                 .thenCompose(ignored -> responseHandler.summaryFuture)
                                 .whenComplete((summary, throwable) -> {
                                     if (throwable != null) {
                                         connection.close().whenComplete((ignored, closeThrowable) -> {
-                                            if (closeThrowable != null) {
+                                            if (closeThrowable != null && throwable != closeThrowable) {
                                                 throwable.addSuppressed(closeThrowable);
                                             }
                                             beginFuture.completeExceptionally(throwable);
@@ -230,15 +227,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         ensureCanRunQueries();
         var parameters = query.parameters().asMap(Values::value);
         var resultCursor = new ResultCursorImpl(
-                connection,
-                query,
-                fetchSize,
-                this::markTerminated,
-                (bookmark) -> {},
-                false,
-                () -> executeWithLock(lock, () -> causeOfTermination),
-                beginFuture,
-                apiTelemetryWork);
+                connection, query, fetchSize, (bookmark) -> {}, false, beginFuture, apiTelemetryWork);
         var flushStage = connection
                 .run(query.text(), parameters)
                 .thenCompose(ignored -> connection.pull(-1, fetchSize))
@@ -255,15 +244,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     public CompletionStage<RxResultCursor> runRx(Query query) {
         ensureCanRunQueries();
         var parameters = query.parameters().asMap(Values::value);
-        var responseHandler = new RunRxResponseHandler(
-                logging,
-                apiTelemetryWork,
-                () -> executeWithLock(lock, () -> causeOfTermination),
-                this::markTerminated,
-                beginFuture,
-                this,
-                connection,
-                query);
+        var responseHandler = new RunRxResponseHandler(logging, apiTelemetryWork, beginFuture, connection, query);
         var flushStage =
                 connection.run(query.text(), parameters).thenCompose(ignored2 -> connection.flush(responseHandler));
         return beginFuture.thenCompose(ignored -> {
@@ -278,15 +259,16 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     }
 
     public void markTerminated(Throwable cause) {
+        var throwable = Futures.completionExceptionCause(cause);
         executeWithLock(lock, () -> {
             if (state == State.TERMINATED) {
-                if (cause != null) {
-                    addSuppressedWhenNotCaptured(causeOfTermination, cause);
+                if (throwable != null) {
+                    addSuppressedWhenNotCaptured(causeOfTermination, throwable);
                 }
             } else {
                 state = State.TERMINATED;
-                causeOfTermination = cause != null
-                        ? cause
+                causeOfTermination = throwable != null
+                        ? throwable
                         : new TransactionTerminatedException(
                                 GqlStatusError.UNKNOWN.getStatus(),
                                 GqlStatusError.UNKNOWN.getStatusDescription(EXPLICITLY_TERMINATED_MSG),
@@ -429,19 +411,16 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                                         .ifPresent(bookmarkConsumer);
                                 commitSummary.complete(summary);
                             } else {
-                                throwable = executeWithLock(lock, () -> causeOfTermination);
-                                if (throwable == null) {
-                                    var message = summaries.ignored() > 0
-                                            ? "Commit exchange contains ignored messages"
-                                            : "Unexpected state during commit";
-                                    throwable = new ClientException(
-                                            GqlStatusError.UNKNOWN.getStatus(),
-                                            GqlStatusError.UNKNOWN.getStatusDescription(message),
-                                            "N/A",
-                                            message,
-                                            GqlStatusError.DIAGNOSTIC_RECORD,
-                                            null);
-                                }
+                                var message = summaries.ignored() > 0
+                                        ? "Commit exchange contains ignored messages"
+                                        : "Unexpected state during commit";
+                                throwable = new ClientException(
+                                        GqlStatusError.UNKNOWN.getStatus(),
+                                        GqlStatusError.UNKNOWN.getStatusDescription(message),
+                                        "N/A",
+                                        message,
+                                        GqlStatusError.DIAGNOSTIC_RECORD,
+                                        null);
                                 commitSummary.completeExceptionally(throwable);
                             }
                         }
@@ -468,19 +447,16 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                             if (summary != null) {
                                 rollbackFuture.complete(null);
                             } else {
-                                throwable = executeWithLock(lock, () -> causeOfTermination);
-                                if (throwable == null) {
-                                    var message = summaries.ignored() > 0
-                                            ? "Rollback exchange contains ignored messages"
-                                            : "Unexpected state during rollback";
-                                    throwable = new ClientException(
-                                            GqlStatusError.UNKNOWN.getStatus(),
-                                            GqlStatusError.UNKNOWN.getStatusDescription(message),
-                                            "N/A",
-                                            message,
-                                            GqlStatusError.DIAGNOSTIC_RECORD,
-                                            null);
-                                }
+                                var message = summaries.ignored() > 0
+                                        ? "Rollback exchange contains ignored messages"
+                                        : "Unexpected state during rollback";
+                                throwable = new ClientException(
+                                        GqlStatusError.UNKNOWN.getStatus(),
+                                        GqlStatusError.UNKNOWN.getStatusDescription(message),
+                                        "N/A",
+                                        message,
+                                        GqlStatusError.DIAGNOSTIC_RECORD,
+                                        null);
                                 rollbackFuture.completeExceptionally(throwable);
                             }
                         }
@@ -603,31 +579,23 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     private static class BeginResponseHandler implements ResponseHandler {
         final CompletableFuture<UnmanagedTransaction> summaryFuture = new CompletableFuture<>();
         private final ApiTelemetryWork apiTelemetryWork;
-        private final Supplier<Throwable> termSupplier;
         private Throwable error;
         private BeginSummary beginSummary;
         private int ignoredCount;
 
-        private BeginResponseHandler(ApiTelemetryWork apiTelemetryWork, Supplier<Throwable> termSupplier) {
+        private BeginResponseHandler(ApiTelemetryWork apiTelemetryWork) {
             this.apiTelemetryWork = apiTelemetryWork;
-            this.termSupplier = termSupplier;
         }
 
-        @SuppressWarnings("DuplicatedCode")
         @Override
         public void onError(Throwable throwable) {
-            if (throwable instanceof CompletionException) {
-                throwable = throwable.getCause();
-            }
+            throwable = Futures.completionExceptionCause(throwable);
             if (error == null) {
                 error = throwable;
             } else {
                 if (error instanceof Neo4jException && !(throwable instanceof Neo4jException)) {
                     // higher order error has occurred
-                    throwable.addSuppressed(error);
                     error = throwable;
-                } else {
-                    error.addSuppressed(throwable);
                 }
             }
         }
@@ -655,19 +623,16 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                 if (beginSummary != null) {
                     summaryFuture.complete(null);
                 } else {
-                    var throwable = termSupplier.get();
-                    if (throwable == null) {
-                        var message = ignoredCount > 0
-                                ? "Begin exchange contains ignored messages"
-                                : "Unexpected state during begin";
-                        throwable = new ClientException(
-                                GqlStatusError.UNKNOWN.getStatus(),
-                                GqlStatusError.UNKNOWN.getStatusDescription(message),
-                                "N/A",
-                                message,
-                                GqlStatusError.DIAGNOSTIC_RECORD,
-                                null);
-                    }
+                    var message = ignoredCount > 0
+                            ? "Begin exchange contains ignored messages"
+                            : "Unexpected state during begin";
+                    var throwable = new ClientException(
+                            GqlStatusError.UNKNOWN.getStatus(),
+                            GqlStatusError.UNKNOWN.getStatusDescription(message),
+                            "N/A",
+                            message,
+                            GqlStatusError.DIAGNOSTIC_RECORD,
+                            null);
                     summaryFuture.completeExceptionally(throwable);
                 }
             }
@@ -678,10 +643,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         final CompletableFuture<RxResultCursor> cursorFuture = new CompletableFuture<>();
         private final Logging logging;
         private final ApiTelemetryWork apiTelemetryWork;
-        private final Supplier<Throwable> termSupplier;
-        private final Consumer<Throwable> markTerminated;
         private final CompletableFuture<UnmanagedTransaction> beginFuture;
-        private final UnmanagedTransaction transaction;
         private final BoltConnection connection;
         private final Query query;
         private Throwable error;
@@ -691,37 +653,25 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         private RunRxResponseHandler(
                 Logging logging,
                 ApiTelemetryWork apiTelemetryWork,
-                Supplier<Throwable> termSupplier,
-                Consumer<Throwable> markTerminated,
                 CompletableFuture<UnmanagedTransaction> beginFuture,
-                UnmanagedTransaction transaction,
                 BoltConnection connection,
                 Query query) {
             this.logging = logging;
             this.apiTelemetryWork = apiTelemetryWork;
-            this.termSupplier = termSupplier;
-            this.markTerminated = markTerminated;
             this.beginFuture = beginFuture;
-            this.transaction = transaction;
             this.connection = connection;
             this.query = query;
         }
 
-        @SuppressWarnings("DuplicatedCode")
         @Override
         public void onError(Throwable throwable) {
-            if (throwable instanceof CompletionException) {
-                throwable = throwable.getCause();
-            }
+            throwable = Futures.completionExceptionCause(throwable);
             if (error == null) {
                 error = throwable;
             } else {
                 if (error instanceof Neo4jException && !(throwable instanceof Neo4jException)) {
                     // higher order error has occurred
-                    throwable.addSuppressed(error);
                     error = throwable;
-                } else {
-                    error.addSuppressed(throwable);
                 }
             }
         }
@@ -744,47 +694,24 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         @Override
         public void onComplete() {
             if (error != null) {
-                if (beginFuture.completeExceptionally(error)) {
-                    markTerminated.accept(error);
-                } else {
-                    markTerminated.accept(error);
-                    cursorFuture.complete(new RxResultCursorImpl(
-                            connection,
-                            query,
-                            null,
-                            error,
-                            bookmark -> {},
-                            transaction::markTerminated,
-                            false,
-                            termSupplier,
-                            logging));
+                if (!beginFuture.completeExceptionally(error)) {
+                    cursorFuture.complete(
+                            new RxResultCursorImpl(connection, query, null, error, bookmark -> {}, false, logging));
                 }
             } else {
                 if (runSummary != null) {
                     cursorFuture.complete(new RxResultCursorImpl(
-                            connection,
-                            query,
-                            runSummary,
-                            null,
-                            bookmark -> {},
-                            transaction::markTerminated,
-                            false,
-                            termSupplier,
-                            logging));
+                            connection, query, runSummary, null, bookmark -> {}, false, logging));
                 } else {
-                    var throwable = termSupplier.get();
-                    if (throwable == null) {
-                        var message = ignoredCount > 0
-                                ? "Run exchange contains ignored messages"
-                                : "Unexpected state during run";
-                        throwable = new ClientException(
-                                GqlStatusError.UNKNOWN.getStatus(),
-                                GqlStatusError.UNKNOWN.getStatusDescription(message),
-                                "N/A",
-                                message,
-                                GqlStatusError.DIAGNOSTIC_RECORD,
-                                null);
-                    }
+                    var message =
+                            ignoredCount > 0 ? "Run exchange contains ignored messages" : "Unexpected state during run";
+                    var throwable = new ClientException(
+                            GqlStatusError.UNKNOWN.getStatus(),
+                            GqlStatusError.UNKNOWN.getStatusDescription(message),
+                            "N/A",
+                            message,
+                            GqlStatusError.DIAGNOSTIC_RECORD,
+                            null);
                     if (!beginFuture.completeExceptionally(throwable)) {
                         cursorFuture.completeExceptionally(throwable);
                     }

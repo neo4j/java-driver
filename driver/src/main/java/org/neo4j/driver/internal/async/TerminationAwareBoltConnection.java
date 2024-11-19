@@ -16,208 +16,113 @@
  */
 package org.neo4j.driver.internal.async;
 
-import java.time.Duration;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import org.neo4j.driver.Value;
-import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import java.util.function.Consumer;
+import org.neo4j.driver.Logger;
+import org.neo4j.driver.Logging;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
-import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
-import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
-import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
-import org.neo4j.driver.internal.bolt.api.TelemetryApi;
-import org.neo4j.driver.internal.bolt.api.TransactionType;
+import org.neo4j.driver.internal.util.Futures;
 
-public class TerminationAwareBoltConnection implements BoltConnection {
-    private final BoltConnection delegate;
+final class TerminationAwareBoltConnection extends DelegatingBoltConnection {
+    private final Logging logging;
+    private final Logger log;
     private final TerminationAwareStateLockingExecutor executor;
+    private final Consumer<Throwable> throwableConsumer;
 
-    public TerminationAwareBoltConnection(BoltConnection delegate, TerminationAwareStateLockingExecutor executor) {
-        this.delegate = Objects.requireNonNull(delegate);
+    public TerminationAwareBoltConnection(
+            Logging logging,
+            BoltConnection delegate,
+            TerminationAwareStateLockingExecutor executor,
+            Consumer<Throwable> throwableConsumer) {
+        super(delegate);
+        this.logging = Objects.requireNonNull(logging);
+        this.log = logging.getLog(getClass());
         this.executor = Objects.requireNonNull(executor);
+        this.throwableConsumer = Objects.requireNonNull(throwableConsumer);
     }
 
     public CompletionStage<BoltConnection> clearAndReset() {
         var future = new CompletableFuture<BoltConnection>();
         var thisVal = this;
-        delegate.clear()
-                .thenCompose(BoltConnection::reset)
-                .thenCompose(connection -> connection.flush(new ResponseHandler() {
-                    @Override
-                    public void onError(Throwable throwable) {
-                        future.completeExceptionally(throwable);
-                    }
 
-                    @Override
-                    public void onComplete() {
-                        future.complete(thisVal);
-                    }
-                }))
-                .whenComplete((result, throwable) -> {
+        delegate.onLoop()
+                .thenCompose(connection -> executor.execute(ignored -> connection
+                        .clear()
+                        .thenCompose(BoltConnection::reset)
+                        .thenCompose(conn -> conn.flush(new ResponseHandler() {
+                            Throwable throwable = null;
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                log.error("Unexpected error occurred while resetting connection", throwable);
+                                throwableConsumer.accept(throwable);
+                                this.throwable = throwable;
+                            }
+
+                            @Override
+                            public void onComplete() {
+                                if (throwable != null) {
+                                    future.completeExceptionally(throwable);
+                                } else {
+                                    future.complete(thisVal);
+                                }
+                            }
+                        }))))
+                .whenComplete((ignored, throwable) -> {
                     if (throwable != null) {
+                        throwableConsumer.accept(throwable);
                         future.completeExceptionally(throwable);
                     }
                 });
+
         return future;
     }
 
     @Override
-    public boolean telemetrySupported() {
-        return delegate.telemetrySupported();
-    }
-
-    @Override
-    public BoltProtocolVersion protocolVersion() {
-        return delegate.protocolVersion();
-    }
-
-    @Override
-    public BoltServerAddress serverAddress() {
-        return delegate.serverAddress();
-    }
-
-    @Override
-    public String serverAgent() {
-        return delegate.serverAgent();
-    }
-
-    @Override
-    public CompletionStage<AuthData> authData() {
-        return delegate.authData();
-    }
-
-    @Override
-    public BoltConnectionState state() {
-        return delegate.state();
-    }
-
-    @Override
-    public CompletionStage<Void> close() {
-        return delegate.close();
-    }
-
-    @Override
-    public CompletionStage<Void> forceClose(String reason) {
-        return delegate.forceClose(reason);
-    }
-
-    @Override
     public CompletionStage<Void> flush(ResponseHandler handler) {
-        return executor.execute(causeOfTermination -> {
-            if (causeOfTermination == null) {
-                return delegate.flush(handler);
-            } else {
-                return CompletableFuture.failedStage(causeOfTermination);
-            }
-        });
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> telemetry(TelemetryApi telemetryApi) {
-        return delegate.telemetry(telemetryApi);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> clear() {
-        return delegate.clear();
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> logon(Map<String, Value> authMap) {
-        return delegate.logon(authMap);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> logoff() {
-        return delegate.logoff();
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> reset() {
-        return delegate.reset();
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> rollback() {
-        return delegate.rollback();
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> commit() {
-        return delegate.commit();
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> discard(long qid, long number) {
-        return delegate.discard(qid, number);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> pull(long qid, long request) {
-        return delegate.pull(qid, request);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> run(String query, Map<String, Value> parameters) {
-        return delegate.run(query, parameters);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> runInAutoCommitTransaction(
-            DatabaseName databaseName,
-            AccessMode accessMode,
-            String impersonatedUser,
-            Set<String> bookmarks,
-            String query,
-            Map<String, Value> parameters,
-            Duration txTimeout,
-            Map<String, Value> txMetadata,
-            NotificationConfig notificationConfig) {
-        return delegate.runInAutoCommitTransaction(
-                databaseName,
-                accessMode,
-                impersonatedUser,
-                bookmarks,
-                query,
-                parameters,
-                txTimeout,
-                txMetadata,
-                notificationConfig);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> beginTransaction(
-            DatabaseName databaseName,
-            AccessMode accessMode,
-            String impersonatedUser,
-            Set<String> bookmarks,
-            TransactionType transactionType,
-            Duration txTimeout,
-            Map<String, Value> txMetadata,
-            String txType,
-            NotificationConfig notificationConfig) {
-        return delegate.beginTransaction(
-                databaseName,
-                accessMode,
-                impersonatedUser,
-                bookmarks,
-                transactionType,
-                txTimeout,
-                txMetadata,
-                txType,
-                notificationConfig);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> route(
-            DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks) {
-        return delegate.route(databaseName, impersonatedUser, bookmarks);
+        return delegate.onLoop()
+                .thenCompose(connection -> executor.execute(causeOfTermination -> {
+                    if (causeOfTermination == null) {
+                        log.trace("This connection is active, will flush");
+                        var terminationAwareResponseHandler =
+                                new TerminationAwareResponseHandler(logging, handler, executor, throwableConsumer);
+                        return delegate.flush(terminationAwareResponseHandler).handle((ignored, flushThrowable) -> {
+                            flushThrowable = Futures.completionExceptionCause(flushThrowable);
+                            if (flushThrowable != null) {
+                                if (log.isTraceEnabled()) {
+                                    log.error("The flush has failed", flushThrowable);
+                                }
+                                var flushThrowableRef = flushThrowable;
+                                flushThrowable = executor.execute(existingThrowable -> {
+                                    if (existingThrowable != null) {
+                                        log.trace(
+                                                "The flush has failed, but there is an existing %s", existingThrowable);
+                                        return existingThrowable;
+                                    } else {
+                                        throwableConsumer.accept(flushThrowableRef);
+                                        return flushThrowableRef;
+                                    }
+                                });
+                                // rethrow
+                                if (flushThrowable instanceof RuntimeException runtimeException) {
+                                    throw runtimeException;
+                                } else {
+                                    throw new CompletionException(flushThrowable);
+                                }
+                            } else {
+                                return ignored;
+                            }
+                        });
+                    } else {
+                        // there is an existing error
+                        return connection
+                                .clear()
+                                .thenCompose(ignored -> CompletableFuture.failedStage(causeOfTermination));
+                    }
+                }));
     }
 }
