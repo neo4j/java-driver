@@ -17,14 +17,12 @@
 package org.neo4j.driver;
 
 import org.neo4j.driver.internal.InternalRotatingClientCertificateManager;
-import org.neo4j.driver.util.Preview;
 
 /**
  * Implementations of {@link ClientCertificateManager}.
  *
  * @since 5.19
  */
-@Preview(name = "mTLS")
 public final class ClientCertificateManagers {
     private ClientCertificateManagers() {}
 

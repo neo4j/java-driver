@@ -16,13 +16,10 @@
  */
 package org.neo4j.driver;
 
-import org.neo4j.driver.util.Preview;
-
 /**
  * A {@link ClientCertificateManager} that supports rotating its {@link ClientCertificate}.
  * @since 5.19
  */
-@Preview(name = "mTLS")
 public sealed interface RotatingClientCertificateManager extends ClientCertificateManager
         permits org.neo4j.driver.internal.InternalRotatingClientCertificateManager {
     /**

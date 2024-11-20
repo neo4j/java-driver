@@ -23,7 +23,6 @@ import org.neo4j.driver.internal.DriverFactory;
 import org.neo4j.driver.internal.ValidatingClientCertificateManager;
 import org.neo4j.driver.internal.security.StaticAuthTokenManager;
 import org.neo4j.driver.internal.security.ValidatingAuthTokenManager;
-import org.neo4j.driver.util.Preview;
 
 /**
  * Creates {@link Driver drivers}, optionally letting you {@link #driver(URI, Config)} to configure them.
@@ -190,7 +189,6 @@ public final class GraphDatabase {
      * @since 5.19
      * @see ClientCertificateManager
      */
-    @Preview(name = "mTLS")
     public static Driver driver(String uri, ClientCertificateManager clientCertificateManager) {
         return driver(URI.create(uri), clientCertificateManager);
     }
@@ -204,7 +202,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(String uri, ClientCertificateManager clientCertificateManager, Config config) {
         return driver(URI.create(uri), clientCertificateManager, config);
     }
@@ -217,7 +214,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(String uri, AuthToken authToken, ClientCertificateManager clientCertificateManager) {
         return driver(URI.create(uri), authToken, clientCertificateManager);
     }
@@ -232,7 +228,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(
             String uri, AuthToken authToken, ClientCertificateManager clientCertificateManager, Config config) {
         return driver(URI.create(uri), authToken, clientCertificateManager, config);
@@ -247,7 +242,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(
             String uri, AuthTokenManager authTokenManager, ClientCertificateManager clientCertificateManager) {
         return driver(URI.create(uri), authTokenManager, clientCertificateManager);
@@ -263,7 +257,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(
             String uri,
             AuthTokenManager authTokenManager,
@@ -279,7 +272,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(URI uri, ClientCertificateManager clientCertificateManager) {
         return driver(uri, clientCertificateManager, Config.defaultConfig());
     }
@@ -293,7 +285,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(URI uri, ClientCertificateManager clientCertificateManager, Config config) {
         return driver(uri, AuthTokens.none(), clientCertificateManager, config);
     }
@@ -306,7 +297,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(URI uri, AuthToken authToken, ClientCertificateManager clientCertificateManager) {
         return driver(uri, authToken, clientCertificateManager, Config.defaultConfig());
     }
@@ -321,7 +311,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(
             URI uri, AuthToken authToken, ClientCertificateManager clientCertificateManager, Config config) {
         return driver(uri, authToken, clientCertificateManager, config, new DriverFactory());
@@ -336,7 +325,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(
             URI uri, AuthTokenManager authTokenManager, ClientCertificateManager clientCertificateManager) {
         return driver(uri, authTokenManager, clientCertificateManager, Config.defaultConfig());
@@ -352,7 +340,6 @@ public final class GraphDatabase {
      * @return a new driver to the database instance specified by the URL
      * @since 5.19
      */
-    @Preview(name = "mTLS")
     public static Driver driver(
             URI uri,
             AuthTokenManager authTokenManager,

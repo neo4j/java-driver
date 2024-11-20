@@ -17,7 +17,6 @@
 package org.neo4j.driver;
 
 import org.neo4j.driver.internal.InternalClientCertificate;
-import org.neo4j.driver.util.Preview;
 
 /**
  * An opaque container for client certificate used for mTLS.
@@ -25,5 +24,4 @@ import org.neo4j.driver.util.Preview;
  * Use {@link ClientCertificates} to create new instances.
  * @since 5.19
  */
-@Preview(name = "mTLS")
 public sealed interface ClientCertificate permits InternalClientCertificate {}
