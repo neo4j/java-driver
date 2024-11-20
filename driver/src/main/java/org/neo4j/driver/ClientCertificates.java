@@ -19,13 +19,11 @@ package org.neo4j.driver;
 import java.io.File;
 import java.util.Objects;
 import org.neo4j.driver.internal.InternalClientCertificate;
-import org.neo4j.driver.util.Preview;
 
 /**
  * Creates new instances of {@link ClientCertificate}.
  * @since 5.19
  */
-@Preview(name = "mTLS")
 public final class ClientCertificates {
     private ClientCertificates() {}
 

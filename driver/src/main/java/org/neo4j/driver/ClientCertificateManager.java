@@ -17,7 +17,6 @@
 package org.neo4j.driver;
 
 import java.util.concurrent.CompletionStage;
-import org.neo4j.driver.util.Preview;
 
 /**
  * A manager of {@link ClientCertificate} instances used by the driver for mTLS.
@@ -31,7 +30,6 @@ import org.neo4j.driver.util.Preview;
  * operations must not done on the calling thread.
  * @since 5.19
  */
-@Preview(name = "mTLS")
 public interface ClientCertificateManager {
     /**
      * Returns a {@link CompletionStage} of a new {@link ClientCertificate}.
