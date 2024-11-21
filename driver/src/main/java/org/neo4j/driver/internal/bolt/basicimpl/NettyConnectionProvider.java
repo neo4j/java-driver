@@ -25,12 +25,10 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
-import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.resolver.AddressResolverGroup;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.net.UnixDomainSocketAddress;
 import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -54,7 +52,7 @@ import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.ConnectTimeoutHand
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.BoltProtocol;
 import org.neo4j.driver.internal.bolt.basicimpl.spi.Connection;
 
-public final class NettyConnectionProvider {
+public final class NettyConnectionProvider implements ConnectionProvider {
     private final EventLoopGroup eventLoopGroup;
     private final Clock clock;
     private final DomainNameResolver domainNameResolver;
@@ -77,6 +75,7 @@ public final class NettyConnectionProvider {
         this.logging = logging;
     }
 
+    @Override
     public CompletionStage<Connection> acquireConnection(
             BoltServerAddress address,
             SecurityPlan securityPlan,
@@ -91,9 +90,27 @@ public final class NettyConnectionProvider {
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
             MetricsListener metricsListener) {
+        var bootstrap = new Bootstrap();
+        bootstrap
+                .group(this.eventLoopGroup)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
+                .channel(localAddress != null ? LocalChannel.class : NioSocketChannel.class)
+                .resolver(addressResolverGroup)
+                .handler(new NettyChannelInitializer(address, securityPlan, connectTimeoutMillis, clock, logging));
 
-        return installChannelConnectedListeners(
-                        address, connect(address, securityPlan, connectTimeoutMillis), connectTimeoutMillis)
+        SocketAddress socketAddress;
+        if (localAddress == null) {
+            try {
+                socketAddress =
+                        new InetSocketAddress(domainNameResolver.resolve(address.connectionHost())[0], address.port());
+            } catch (Throwable t) {
+                socketAddress = InetSocketAddress.createUnresolved(address.connectionHost(), address.port());
+            }
+        } else {
+            socketAddress = localAddress;
+        }
+
+        return installChannelConnectedListeners(address, bootstrap.connect(socketAddress), connectTimeoutMillis)
                 .thenCompose(channel -> BoltProtocol.forChannel(channel)
                         .initializeChannel(
                                 channel,
@@ -105,39 +122,6 @@ public final class NettyConnectionProvider {
                                 clock,
                                 latestAuthMillisFuture))
                 .thenApply(channel -> new NetworkConnection(channel, logging));
-    }
-
-    private ChannelFuture connect(BoltServerAddress address, SecurityPlan securityPlan, int connectTimeoutMillis) {
-        Class<? extends Channel> channelClass;
-        SocketAddress socketAddress;
-
-        if (localAddress != null) {
-            channelClass = LocalChannel.class;
-            socketAddress = localAddress;
-        } else {
-            if (address.path() != null) {
-                channelClass = NioDomainSocketChannel.class;
-                socketAddress = UnixDomainSocketAddress.of(address.path());
-            } else {
-                channelClass = NioSocketChannel.class;
-                try {
-                    socketAddress = new InetSocketAddress(
-                            domainNameResolver.resolve(address.connectionHost())[0], address.port());
-                } catch (Throwable t) {
-                    socketAddress = InetSocketAddress.createUnresolved(address.connectionHost(), address.port());
-                }
-            }
-        }
-
-        var bootstrap = new Bootstrap();
-        bootstrap
-                .group(this.eventLoopGroup)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
-                .channel(channelClass)
-                .resolver(addressResolverGroup)
-                .handler(new NettyChannelInitializer(address, securityPlan, connectTimeoutMillis, clock, logging));
-
-        return bootstrap.connect(socketAddress);
     }
 
     private CompletionStage<Channel> installChannelConnectedListeners(
