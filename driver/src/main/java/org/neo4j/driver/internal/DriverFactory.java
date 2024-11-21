@@ -24,8 +24,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.util.concurrent.EventExecutorGroup;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -113,6 +111,7 @@ public class DriverFactory {
             ownsEventLoopGroup = false;
         }
 
+        var address = new InternalServerAddress(uri);
         var routingSettings = new RoutingSettings(config.routingTablePurgeDelayMillis(), new RoutingContext(uri));
 
         EventExecutorGroup eventExecutorGroup = bootstrap.config().group();
@@ -123,6 +122,7 @@ public class DriverFactory {
         return createDriver(
                 uri,
                 securityPlanManager,
+                address,
                 bootstrap.group(),
                 routingSettings,
                 retryLogic,
@@ -149,6 +149,7 @@ public class DriverFactory {
     private InternalDriver createDriver(
             URI uri,
             BoltSecurityPlanManager securityPlanManager,
+            ServerAddress address,
             EventLoopGroup eventLoopGroup,
             RoutingSettings routingSettings,
             RetryLogic retryLogic,
@@ -158,29 +159,11 @@ public class DriverFactory {
             boolean ownsEventLoopGroup,
             Supplier<Rediscovery> rediscoverySupplier) {
         BoltConnectionProvider boltConnectionProvider = null;
-        BoltServerAddress address;
-        if (Scheme.BOLT_UNIX_URI_SCHEME.equals(uri.getScheme())) {
-            var path = Path.of(uri.getPath());
-            if (!Files.exists(path)) {
-                throw new IllegalArgumentException(String.format("%s does not exist", path));
-            }
-            address = new BoltServerAddress(path);
-        } else {
-            var port = uri.getPort();
-            if (port == -1) {
-                port = InternalServerAddress.DEFAULT_PORT;
-            }
-            if (port >= 0 && port <= 65_535) {
-                address = new BoltServerAddress(uri.getHost(), port);
-            } else {
-                throw new IllegalArgumentException("Illegal port: " + port);
-            }
-        }
         try {
             boltConnectionProvider =
                     createBoltConnectionProvider(uri, config, eventLoopGroup, routingSettings, rediscoverySupplier);
             boltConnectionProvider.init(
-                    address,
+                    new BoltServerAddress(address.host(), address.port()),
                     new RoutingContext(uri),
                     DriverInfoUtil.boltAgent(),
                     config.userAgent(),

@@ -52,13 +52,13 @@ import org.neo4j.driver.Config;
 import org.neo4j.driver.NotificationClassification;
 import org.neo4j.driver.internal.DriverFactory;
 import org.neo4j.driver.internal.InternalNotificationSeverity;
+import org.neo4j.driver.internal.InternalServerAddress;
 import org.neo4j.driver.internal.SecuritySettings;
 import org.neo4j.driver.internal.bolt.api.DefaultDomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
 import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
 import org.neo4j.driver.internal.security.SecurityPlans;
 import org.neo4j.driver.internal.security.StaticAuthTokenManager;
-import org.neo4j.driver.net.ServerAddress;
 import org.neo4j.driver.net.ServerAddressResolver;
 import reactor.core.publisher.Mono;
 
@@ -176,10 +176,7 @@ public class NewDriver implements TestkitRequest {
                 throw new RuntimeException(e);
             }
             return resolutionCompleted.getData().getAddresses().stream()
-                    .map(value -> {
-                        var tokens = value.split(":");
-                        return ServerAddress.of(tokens[0], Integer.parseInt(tokens[1]));
-                    })
+                    .map(InternalServerAddress::new)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
         };
     }
