@@ -53,7 +53,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     private final LoggingProvider logging;
     private final System.Logger log;
 
-    private final ConnectionProvider connectionProvider;
+    private final NettyConnectionProvider connectionProvider;
 
     private BoltServerAddress address;
 
@@ -76,7 +76,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         this.logging = Objects.requireNonNull(logging);
         this.log = logging.getLog(getClass());
         this.connectionProvider =
-                ConnectionProviders.netty(eventLoopGroup, clock, domainNameResolver, localAddress, logging);
+                new NettyConnectionProvider(eventLoopGroup, clock, domainNameResolver, localAddress, logging);
     }
 
     @Override
