@@ -64,8 +64,8 @@ import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.TransactionTerminatedException;
 import org.neo4j.driver.internal.FailableCursor;
 import org.neo4j.driver.internal.InternalBookmark;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
@@ -860,11 +860,11 @@ class UnmanagedTransactionTest {
             Function<UnmanagedTransaction, CompletionStage<?>> runAction,
             String expectedMessage) {}
 
-    private static UnmanagedTransaction beginTx(BoltConnection connection) {
+    private static UnmanagedTransaction beginTx(DriverBoltConnection connection) {
         return beginTx(connection, Collections.emptySet());
     }
 
-    private static UnmanagedTransaction beginTx(BoltConnection connection, Set<Bookmark> initialBookmarks) {
+    private static UnmanagedTransaction beginTx(DriverBoltConnection connection, Set<Bookmark> initialBookmarks) {
         var apiTelemetryWork = new ApiTelemetryWork(TelemetryApi.UNMANAGED_TRANSACTION);
         var tx = new UnmanagedTransaction(
                 connection,

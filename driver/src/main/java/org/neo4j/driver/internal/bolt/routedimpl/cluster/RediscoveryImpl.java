@@ -34,16 +34,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.AuthTokenManagerExecutionException;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.DiscoveryException;
-import org.neo4j.driver.exceptions.FatalDiscoveryException;
-import org.neo4j.driver.exceptions.ProtocolException;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -54,8 +46,14 @@ import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.exception.BoltDiscoveryException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltProtocolException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
+import org.neo4j.driver.internal.bolt.routedimpl.AuthTokenManagerExecutionException;
 import org.neo4j.driver.internal.bolt.routedimpl.util.FutureUtil;
 
 public class RediscoveryImpl implements Rediscovery {
@@ -100,7 +98,7 @@ public class RediscoveryImpl implements Rediscovery {
             BoltProtocolVersion minVersion) {
         var result = new CompletableFuture<ClusterCompositionLookupResult>();
         // if we failed discovery, we will chain all errors into this one.
-        var baseError = new ServiceUnavailableException(
+        var baseError = new BoltServiceUnavailableException(
                 String.format(NO_ROUTERS_AVAILABLE, routingTable.database().description()));
         lookupClusterComposition(
                 securityPlan,
@@ -401,7 +399,7 @@ public class RediscoveryImpl implements Rediscovery {
                     if (clusterComposition.routers().isEmpty()
                             || clusterComposition.readers().isEmpty()) {
                         throw new CompletionException(
-                                new ProtocolException(
+                                new BoltProtocolException(
                                         "Failed to parse result received from server due to no router or reader found in response."));
                     } else {
                         return clusterComposition;
@@ -441,7 +439,7 @@ public class RediscoveryImpl implements Rediscovery {
         }
 
         // Retryable error happened during discovery.
-        var discoveryError = new DiscoveryException(format(RECOVERABLE_ROUTING_ERROR, routerAddress), error);
+        var discoveryError = new BoltDiscoveryException(format(RECOVERABLE_ROUTING_ERROR, routerAddress), error);
         FutureUtil.combineErrors(baseError, discoveryError); // we record each failure here
         log.log(System.Logger.Level.WARNING, RECOVERABLE_DISCOVERY_ERROR_WITH_SERVER, routerAddress);
         log.log(
@@ -452,34 +450,62 @@ public class RediscoveryImpl implements Rediscovery {
         return null;
     }
 
+    @SuppressWarnings("SwitchStatementWithTooFewBranches")
     private boolean mustAbortDiscovery(Throwable throwable) {
         var abort = false;
 
-        if (!(throwable instanceof AuthorizationExpiredException) && throwable instanceof SecurityException) {
-            abort = true;
-        } else if (throwable instanceof FatalDiscoveryException) {
-            abort = true;
+        if (throwable instanceof BoltFailureException boltFailureException) {
+            var code = boltFailureException.code();
+            abort = switch (extractErrorClass(code)) {
+                case "ClientError" -> {
+                    if ("Security".equals(extractErrorSubClass(code))) {
+                        yield !"Neo.ClientError.Security.AuthorizationExpired".equalsIgnoreCase(code);
+                    } else {
+                        if ("Neo.ClientError.Database.DatabaseNotFound".equalsIgnoreCase(code)) {
+                            yield true;
+                        } else {
+                            yield switch (code) {
+                                case TRANSACTION_INVALID_BOOKMARK_CODE,
+                                        TRANSACTION_INVALID_BOOKMARK_MIXTURE_CODE,
+                                        STATEMENT_ARGUMENT_ERROR_CODE,
+                                        REQUEST_INVALID_CODE,
+                                        STATEMENT_TYPE_ERROR_CODE -> true;
+                                default -> false;
+                            };
+                        }
+                    }
+                }
+                default -> false;};
         } else if (throwable instanceof IllegalStateException
                 && "Connection provider is closed.".equals(throwable.getMessage())) {
             abort = true;
-        } else if (throwable instanceof AuthTokenManagerExecutionException) {
+        } else if (throwable instanceof BoltUnsupportedFeatureException) {
             abort = true;
-        } else if (throwable instanceof UnsupportedFeatureException) {
-            abort = true;
-        } else if (throwable instanceof ClientException) {
-            var code = ((ClientException) throwable).code();
-            abort = switch (code) {
-                case TRANSACTION_INVALID_BOOKMARK_CODE,
-                        TRANSACTION_INVALID_BOOKMARK_MIXTURE_CODE,
-                        STATEMENT_ARGUMENT_ERROR_CODE,
-                        REQUEST_INVALID_CODE,
-                        STATEMENT_TYPE_ERROR_CODE -> true;
-                default -> false;};
         } else if (throwable instanceof MinVersionAcquisitionException) {
+            abort = true;
+        } else if (throwable instanceof SSLHandshakeException) {
+            abort = true;
+        } else if (throwable instanceof AuthTokenManagerExecutionException) {
             abort = true;
         }
 
         return abort;
+    }
+
+    private static String extractErrorClass(String code) {
+        var parts = code.split("\\.");
+        if (parts.length < 2) {
+            return "";
+        }
+        return parts[1];
+    }
+
+    private static String extractErrorSubClass(String code) {
+        var parts = code.split("\\.");
+        if (parts.length < 3) {
+            return "";
+        }
+        return parts[2];
     }
 
     @Override

@@ -26,17 +26,14 @@ import io.netty.handler.codec.ReplayingDecoder;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelErrorLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.BoltProtocol;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.MessageFormat;
-import org.neo4j.driver.internal.util.ErrorUtil;
 
 public class HandshakeHandler extends ReplayingDecoder<Void> {
     private final ChannelPipelineBuilder pipelineBuilder;
@@ -74,9 +71,15 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
 
         if (!failed) {
             // channel became inactive while doing bolt handshake, not because of some previous error
-            var error = ErrorUtil.newConnectionTerminatedError();
+            var error = newConnectionTerminatedError();
             fail(ctx, error);
         }
+    }
+
+    public static BoltServiceUnavailableException newConnectionTerminatedError() {
+        return new BoltServiceUnavailableException("Connection to the database terminated. "
+                + "Please ensure that your database is listening on the correct host and port and that you have compatible encryption settings both on Neo4j server and driver. "
+                + "Note that the default encryption setting has changed in Neo4j 4.0.");
     }
 
     @Override
@@ -109,7 +112,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private BoltProtocol protocolForVersion(BoltProtocolVersion version) {
         try {
             return BoltProtocol.forVersion(version);
-        } catch (ClientException e) {
+        } catch (BoltClientException e) {
             return null;
         }
     }
@@ -135,39 +138,20 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     }
 
     private static Throwable protocolNoSupportedByServerError() {
-        var message = "The server does not support any of the protocol versions supported by "
+        return new BoltClientException("The server does not support any of the protocol versions supported by "
                 + "this driver. Ensure that you are using driver and server versions that "
-                + "are compatible with one another.";
-        return new ClientException(
-                GqlStatusError.UNKNOWN.getStatus(),
-                GqlStatusError.UNKNOWN.getStatusDescription(message),
-                "N/A",
-                message,
-                GqlStatusError.DIAGNOSTIC_RECORD,
-                null);
+                + "are compatible with one another.");
     }
 
     private static Throwable httpEndpointError() {
-        var message = "Server responded HTTP. Make sure you are not trying to connect to the http endpoint "
-                + "(HTTP defaults to port 7474 whereas BOLT defaults to port 7687)";
-        return new ClientException(
-                GqlStatusError.UNKNOWN.getStatus(),
-                GqlStatusError.UNKNOWN.getStatusDescription(message),
-                "N/A",
-                message,
-                GqlStatusError.DIAGNOSTIC_RECORD,
-                null);
+        return new BoltClientException(
+                "Server responded HTTP. Make sure you are not trying to connect to the http endpoint "
+                        + "(HTTP defaults to port 7474 whereas BOLT defaults to port 7687)");
     }
 
     private static Throwable protocolNoSupportedByDriverError(BoltProtocolVersion suggestedProtocolVersion) {
-        var message = "Protocol error, server suggested unexpected protocol version: " + suggestedProtocolVersion;
-        return new ClientException(
-                GqlStatusError.UNKNOWN.getStatus(),
-                GqlStatusError.UNKNOWN.getStatusDescription(message),
-                "N/A",
-                message,
-                GqlStatusError.DIAGNOSTIC_RECORD,
-                null);
+        return new BoltClientException(
+                "Protocol error, server suggested unexpected protocol version: " + suggestedProtocolVersion);
     }
 
     private static Throwable transformError(Throwable error) {
@@ -176,12 +160,10 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
             error = error.getCause();
         }
 
-        if (error instanceof ServiceUnavailableException) {
+        if (error instanceof BoltServiceUnavailableException || error instanceof SSLHandshakeException) {
             return error;
-        } else if (error instanceof SSLHandshakeException) {
-            return new SecurityException("Failed to establish secured connection with the server", error);
         } else {
-            return new ServiceUnavailableException("Failed to establish connection with the server", error);
+            return new BoltServiceUnavailableException("Failed to establish connection with the server", error);
         }
     }
 }

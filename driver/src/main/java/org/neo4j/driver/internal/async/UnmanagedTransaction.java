@@ -44,13 +44,13 @@ import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.TransactionTerminatedException;
 import org.neo4j.driver.internal.DatabaseBookmark;
+import org.neo4j.driver.internal.adaptedbolt.BasicResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.BasicResponseHandler;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.TransactionType;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
@@ -119,7 +119,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     private final ApiTelemetryWork apiTelemetryWork;
 
     public UnmanagedTransaction(
-            BoltConnection connection,
+            DriverBoltConnection connection,
             DatabaseName databaseName,
             AccessMode accessMode,
             String impersonatedUser,
@@ -142,7 +142,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     }
 
     protected UnmanagedTransaction(
-            BoltConnection connection,
+            DriverBoltConnection connection,
             DatabaseName databaseName,
             AccessMode accessMode,
             String impersonatedUser,
@@ -261,26 +261,28 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     public void markTerminated(Throwable cause) {
         var throwable = Futures.completionExceptionCause(cause);
         executeWithLock(lock, () -> {
-            if (state == State.TERMINATED) {
-                if (throwable != null) {
-                    addSuppressedWhenNotCaptured(causeOfTermination, throwable);
+            if (isOpen() && commitFuture == null && rollbackFuture == null) {
+                if (state == State.TERMINATED) {
+                    if (throwable != null) {
+                        addSuppressedWhenNotCaptured(causeOfTermination, throwable);
+                    }
+                } else {
+                    state = State.TERMINATED;
+                    causeOfTermination = throwable != null
+                            ? throwable
+                            : new TransactionTerminatedException(
+                                    GqlStatusError.UNKNOWN.getStatus(),
+                                    GqlStatusError.UNKNOWN.getStatusDescription(EXPLICITLY_TERMINATED_MSG),
+                                    "N/A",
+                                    EXPLICITLY_TERMINATED_MSG,
+                                    GqlStatusError.DIAGNOSTIC_RECORD,
+                                    null);
                 }
-            } else {
-                state = State.TERMINATED;
-                causeOfTermination = throwable != null
-                        ? throwable
-                        : new TransactionTerminatedException(
-                                GqlStatusError.UNKNOWN.getStatus(),
-                                GqlStatusError.UNKNOWN.getStatusDescription(EXPLICITLY_TERMINATED_MSG),
-                                "N/A",
-                                EXPLICITLY_TERMINATED_MSG,
-                                GqlStatusError.DIAGNOSTIC_RECORD,
-                                null);
             }
         });
     }
 
-    public BoltConnection connection() {
+    public DriverBoltConnection connection() {
         return connection;
     }
 
@@ -576,7 +578,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         return stage;
     }
 
-    private static class BeginResponseHandler implements ResponseHandler {
+    private static class BeginResponseHandler implements DriverResponseHandler {
         final CompletableFuture<UnmanagedTransaction> summaryFuture = new CompletableFuture<>();
         private final ApiTelemetryWork apiTelemetryWork;
         private Throwable error;
@@ -639,12 +641,12 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         }
     }
 
-    private static class RunRxResponseHandler implements ResponseHandler {
+    private static class RunRxResponseHandler implements DriverResponseHandler {
         final CompletableFuture<RxResultCursor> cursorFuture = new CompletableFuture<>();
         private final Logging logging;
         private final ApiTelemetryWork apiTelemetryWork;
         private final CompletableFuture<UnmanagedTransaction> beginFuture;
-        private final BoltConnection connection;
+        private final DriverBoltConnection connection;
         private final Query query;
         private Throwable error;
         private RunSummary runSummary;
@@ -654,7 +656,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                 Logging logging,
                 ApiTelemetryWork apiTelemetryWork,
                 CompletableFuture<UnmanagedTransaction> beginFuture,
-                BoltConnection connection,
+                DriverBoltConnection connection,
                 Query query) {
             this.logging = logging;
             this.apiTelemetryWork = apiTelemetryWork;

@@ -238,6 +238,7 @@ public class Neo4jException extends RuntimeException {
         return findFirstGqlCause(this, Neo4jException.class);
     }
 
+    @SuppressWarnings("DuplicatedCode")
     private static <T extends Throwable> Optional<T> findFirstGqlCause(Throwable throwable, Class<T> targetCls) {
         var cause = throwable.getCause();
         if (cause == null) {

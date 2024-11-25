@@ -33,9 +33,9 @@ import org.neo4j.driver.Logging;
 import org.neo4j.driver.NotificationConfig;
 import org.neo4j.driver.SessionConfig;
 import org.neo4j.driver.Value;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.async.LeakLoggingNetworkSession;
 import org.neo4j.driver.internal.async.NetworkSession;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
@@ -45,7 +45,7 @@ import org.neo4j.driver.internal.security.InternalAuthToken;
 
 public class SessionFactoryImpl implements SessionFactory {
     private final BoltSecurityPlanManager securityPlanManager;
-    private final BoltConnectionProvider connectionProvider;
+    private final DriverBoltConnectionProvider connectionProvider;
     private final RetryLogic retryLogic;
     private final Logging logging;
     private final boolean leakedSessionsLoggingEnabled;
@@ -54,7 +54,7 @@ public class SessionFactoryImpl implements SessionFactory {
 
     SessionFactoryImpl(
             BoltSecurityPlanManager securityPlanManager,
-            BoltConnectionProvider connectionProvider,
+            DriverBoltConnectionProvider connectionProvider,
             RetryLogic retryLogic,
             Config config,
             AuthTokenManager authTokenManager) {
@@ -163,7 +163,7 @@ public class SessionFactoryImpl implements SessionFactory {
 
     private NetworkSession createSession(
             BoltSecurityPlanManager securityPlanManager,
-            BoltConnectionProvider connectionProvider,
+            DriverBoltConnectionProvider connectionProvider,
             RetryLogic retryLogic,
             DatabaseName databaseName,
             AccessMode mode,
@@ -214,7 +214,7 @@ public class SessionFactoryImpl implements SessionFactory {
                         authTokenManager);
     }
 
-    public BoltConnectionProvider getConnectionProvider() {
+    public DriverBoltConnectionProvider getConnectionProvider() {
         return connectionProvider;
     }
 

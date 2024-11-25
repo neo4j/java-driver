@@ -43,8 +43,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.BoltProtocolUtil;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelPipelineBuilderImpl;
 import org.neo4j.driver.internal.bolt.basicimpl.async.outbound.ChunkAwareByteBufOutput;
@@ -128,7 +128,7 @@ class MessageFormatTest {
 
         // Expect
         Throwable error = assertThrows(CompletionException.class, errorFuture::join);
-        error = assertInstanceOf(ClientException.class, error.getCause());
+        error = assertInstanceOf(BoltClientException.class, error.getCause());
         assertThat(
                 error.getMessage(),
                 startsWith("Invalid message received, serialized NODE structures should have 3 fields, "

@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.UntrustedServerException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUntrustedServerException;
 
 public class MetadataExtractor {
     public static final int ABSENT_QUERY_ID = -1;
@@ -67,11 +67,11 @@ public class MetadataExtractor {
     public static Value extractServer(Map<String, Value> metadata) {
         var versionValue = metadata.get("server");
         if (versionValue == null || versionValue.isNull()) {
-            throw new UntrustedServerException("Server provides no product identifier");
+            throw new BoltUntrustedServerException("Server provides no product identifier");
         }
         var serverAgent = versionValue.asString();
         if (!serverAgent.startsWith("Neo4j/")) {
-            throw new UntrustedServerException(
+            throw new BoltUntrustedServerException(
                     "Server does not identify as a genuine Neo4j instance: '" + serverAgent + "'");
         }
         return versionValue;

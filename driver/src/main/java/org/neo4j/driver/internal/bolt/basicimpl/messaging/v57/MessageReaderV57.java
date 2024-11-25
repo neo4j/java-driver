@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.ProtocolException;
 import org.neo4j.driver.internal.bolt.api.GqlError;
+import org.neo4j.driver.internal.bolt.api.exception.BoltProtocolException;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.ResponseMessageHandler;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v5.MessageReaderV5;
 import org.neo4j.driver.internal.bolt.basicimpl.packstream.PackInput;
@@ -82,7 +82,7 @@ public class MessageReaderV57 extends MessageReaderV5 {
         var cause = params.get("cause");
         if (cause != null) {
             if (!MAP_TYPE.isTypeOf(cause)) {
-                throw new ProtocolException("Unexpected type");
+                throw new BoltProtocolException("Unexpected type");
             }
             gqlError = unpackGqlError(cause.asMap(Values::value));
         }

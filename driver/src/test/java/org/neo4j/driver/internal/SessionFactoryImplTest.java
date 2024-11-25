@@ -26,9 +26,9 @@ import org.junit.jupiter.api.Test;
 import org.neo4j.driver.AccessMode;
 import org.neo4j.driver.AuthTokenManager;
 import org.neo4j.driver.Config;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.async.LeakLoggingNetworkSession;
 import org.neo4j.driver.internal.async.NetworkSession;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
 import org.neo4j.driver.internal.util.FixedRetryLogic;
 
@@ -79,7 +79,7 @@ class SessionFactoryImplTest {
     private static SessionFactory newSessionFactory(Config config) {
         return new SessionFactoryImpl(
                 BoltSecurityPlanManager.insecure(),
-                mock(BoltConnectionProvider.class),
+                mock(DriverBoltConnectionProvider.class),
                 new FixedRetryLogic(0),
                 config,
                 mock(AuthTokenManager.class));

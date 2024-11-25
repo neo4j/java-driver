@@ -38,8 +38,8 @@ import java.util.concurrent.TimeUnit;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 
 class ChannelConnectedListenerTest {
     private final EmbeddedChannel channel = new EmbeddedChannel();
@@ -60,7 +60,7 @@ class ChannelConnectedListenerTest {
 
         listener.operationComplete(channelConnectedPromise);
 
-        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
+        var error = assertThrows(BoltServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(cause, error.getCause());
     }
 
@@ -91,7 +91,7 @@ class ChannelConnectedListenerTest {
 
         assertTrue(handshakeCompletedFuture.isCompletedExceptionally());
         var exception = assertThrows(CompletionException.class, handshakeCompletedFuture::join);
-        assertInstanceOf(ServiceUnavailableException.class, exception.getCause());
+        assertInstanceOf(BoltServiceUnavailableException.class, exception.getCause());
     }
 
     @Test
@@ -104,7 +104,7 @@ class ChannelConnectedListenerTest {
 
         assertTrue(future.isCompletedExceptionally());
         Throwable exception = assertThrows(CompletionException.class, future::join);
-        assertInstanceOf(ServiceUnavailableException.class, exception.getCause());
+        assertInstanceOf(BoltServiceUnavailableException.class, exception.getCause());
         exception = exception.getCause();
         assertEquals(throwable, exception.getCause());
     }

@@ -48,7 +48,7 @@ import org.neo4j.driver.Value;
 import org.neo4j.driver.async.ResultCursor;
 import org.neo4j.driver.exceptions.NoSuchRecordException;
 import org.neo4j.driver.exceptions.ResultConsumedException;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
@@ -340,7 +340,7 @@ class InternalResultTest {
 
     private Result createResult(int numberOfRecords) {
         var query = new Query("<unknown>");
-        var connection = mock(BoltConnection.class);
+        var connection = mock(DriverBoltConnection.class);
         when(connection.serverAddress()).thenReturn(BoltServerAddress.LOCAL_DEFAULT);
         when(connection.protocolVersion()).thenReturn(new BoltProtocolVersion(4, 3));
         when(connection.serverAgent()).thenReturn("Neo4j/4.2.5");

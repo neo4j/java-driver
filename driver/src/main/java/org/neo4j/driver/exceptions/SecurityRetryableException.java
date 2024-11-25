@@ -25,7 +25,7 @@ import org.neo4j.driver.util.Experimental;
  * Indicates that the contained {@link SecurityException} is a {@link RetryableException}, which is determined by the
  * {@link org.neo4j.driver.AuthTokenManager#handleSecurityException(AuthToken, SecurityException)} method.
  * <p>
- * The original {@link java.lang.SecurityException} is always available as a {@link Throwable#getCause()}. The
+ * The original {@link SecurityException} is always available as a {@link Throwable#getCause()}. The
  * {@link SecurityRetryableException#code()} and {@link SecurityRetryableException#getMessage()} supply the values from
  * the original exception.
  *

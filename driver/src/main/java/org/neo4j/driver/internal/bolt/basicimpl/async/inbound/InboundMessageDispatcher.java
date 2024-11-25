@@ -26,12 +26,13 @@ import java.util.Queue;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.api.GqlError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
-import org.neo4j.driver.internal.bolt.api.exception.MessageIgnoredException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltGqlErrorException;
+import org.neo4j.driver.internal.bolt.basicimpl.MessageIgnoredException;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelErrorLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.ResponseMessageHandler;
 import org.neo4j.driver.internal.bolt.basicimpl.spi.ResponseHandler;
-import org.neo4j.driver.internal.util.ErrorUtil;
 
 public class InboundMessageDispatcher implements ResponseMessageHandler {
     private final Channel channel;
@@ -101,10 +102,43 @@ public class InboundMessageDispatcher implements ResponseMessageHandler {
             log.log(System.Logger.Level.DEBUG, "S: FAILURE %s \"%s\"", gqlError.code(), gqlError.message());
         }
 
-        var error = ErrorUtil.newNeo4jError(gqlError);
+        var error = map(gqlError);
         invokeBeforeLastHandlerHook();
         var handler = removeHandler();
         handler.onFailure(error);
+    }
+
+    private BoltFailureException map(GqlError error) {
+        var code = error.code();
+
+        // Since 5.0 these 2 errors have been moved to ClientError class.
+        // This mapping is required when driver is connected to earlier server versions.
+        if ("Neo.TransientError.Transaction.Terminated".equals(code)) {
+            code = "Neo.ClientError.Transaction.Terminated";
+        } else if ("Neo.TransientError.Transaction.LockClientStopped".equals(code)) {
+            code = "Neo.ClientError.Transaction.LockClientStopped";
+        }
+
+        return new BoltFailureException(
+                code,
+                error.message(),
+                error.gqlStatus(),
+                error.statusDescription(),
+                error.diagnosticRecord(),
+                mapNested(error.cause()));
+    }
+
+    private BoltGqlErrorException mapNested(GqlError error) {
+        BoltGqlErrorException mapped = null;
+        if (error != null) {
+            mapped = new BoltGqlErrorException(
+                    error.message(),
+                    error.gqlStatus(),
+                    error.statusDescription(),
+                    error.diagnosticRecord(),
+                    mapNested(error.cause()));
+        }
+        return mapped;
     }
 
     @Override

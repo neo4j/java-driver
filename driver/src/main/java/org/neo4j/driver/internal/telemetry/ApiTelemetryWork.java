@@ -20,7 +20,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 
 public record ApiTelemetryWork(TelemetryApi telemetryApi, AtomicBoolean enabled, AtomicBoolean acknowledged) {
@@ -36,7 +36,7 @@ public record ApiTelemetryWork(TelemetryApi telemetryApi, AtomicBoolean enabled,
         this.acknowledged.set(true);
     }
 
-    public CompletionStage<BoltConnection> pipelineTelemetryIfEnabled(BoltConnection connection) {
+    public CompletionStage<DriverBoltConnection> pipelineTelemetryIfEnabled(DriverBoltConnection connection) {
         if (enabled.get() && connection.telemetrySupported() && !(acknowledged.get())) {
             return connection.telemetry(telemetryApi);
         } else {

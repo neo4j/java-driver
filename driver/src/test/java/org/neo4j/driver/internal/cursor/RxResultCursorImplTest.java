@@ -37,14 +37,14 @@ import org.neo4j.driver.Logging;
 import org.neo4j.driver.Query;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.internal.DatabaseBookmark;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 
 class RxResultCursorImplTest {
     @Mock
-    BoltConnection connection;
+    DriverBoltConnection connection;
 
     @Mock
     Query query;

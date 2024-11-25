@@ -39,12 +39,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.ProtocolException;
 import org.neo4j.driver.internal.InternalNode;
 import org.neo4j.driver.internal.InternalPath;
 import org.neo4j.driver.internal.InternalRelationship;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltProtocolException;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.ValueUnpacker;
 import org.neo4j.driver.internal.bolt.basicimpl.packstream.PackInput;
 import org.neo4j.driver.internal.bolt.basicimpl.packstream.PackStream;
@@ -355,32 +354,18 @@ public class CommonValueUnpacker implements ValueUnpacker {
     protected final void ensureCorrectStructSize(TypeConstructor typeConstructor, int expected, long actual) {
         if (expected != actual) {
             var structName = typeConstructor.toString();
-            var message = String.format(
+            throw new BoltClientException(String.format(
                     "Invalid message received, serialized %s structures should have %d fields, "
                             + "received %s structure has %d fields.",
-                    structName, expected, structName, actual);
-            throw new ClientException(
-                    GqlStatusError.UNKNOWN.getStatus(),
-                    GqlStatusError.UNKNOWN.getStatusDescription(message),
-                    "N/A",
-                    message,
-                    GqlStatusError.DIAGNOSTIC_RECORD,
-                    null);
+                    structName, expected, structName, actual));
         }
     }
 
     protected void ensureCorrectStructSignature(String structName, byte expected, byte actual) {
         if (expected != actual) {
-            var message = String.format(
+            throw new BoltClientException(String.format(
                     "Invalid message received, expected a `%s`, signature 0x%s. Received signature was 0x%s.",
-                    structName, Integer.toHexString(expected), Integer.toHexString(actual));
-            throw new ClientException(
-                    GqlStatusError.UNKNOWN.getStatus(),
-                    GqlStatusError.UNKNOWN.getStatusDescription(message),
-                    "N/A",
-                    message,
-                    GqlStatusError.DIAGNOSTIC_RECORD,
-                    null);
+                    structName, Integer.toHexString(expected), Integer.toHexString(actual)));
         }
     }
 
@@ -466,8 +451,8 @@ public class CommonValueUnpacker implements ValueUnpacker {
         return ZonedDateTime.of(localDateTime, zoneId);
     }
 
-    private ProtocolException instantiateExceptionForUnknownType(byte type) {
-        return new ProtocolException("Unknown struct type: " + type);
+    private BoltProtocolException instantiateExceptionForUnknownType(byte type) {
+        return new BoltProtocolException("Unknown struct type: " + type);
     }
 
     protected int getNodeFields() {

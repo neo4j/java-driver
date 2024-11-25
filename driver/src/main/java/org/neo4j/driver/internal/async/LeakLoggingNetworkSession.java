@@ -28,7 +28,7 @@ import org.neo4j.driver.Bookmark;
 import org.neo4j.driver.BookmarkManager;
 import org.neo4j.driver.Logging;
 import org.neo4j.driver.NotificationConfig;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.retry.RetryLogic;
 import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
@@ -39,7 +39,7 @@ public class LeakLoggingNetworkSession extends NetworkSession {
 
     public LeakLoggingNetworkSession(
             BoltSecurityPlanManager securityPlanManager,
-            BoltConnectionProvider connectionProvider,
+            DriverBoltConnectionProvider connectionProvider,
             RetryLogic retryLogic,
             DatabaseName databaseName,
             AccessMode mode,

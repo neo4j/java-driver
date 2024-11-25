@@ -19,7 +19,7 @@ package org.neo4j.driver.internal.bolt.basicimpl.async.inbound;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import java.util.concurrent.TimeUnit;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 
 /**
  * Handler needed to limit amount of time connection performs TLS and Bolt handshakes.
@@ -43,7 +43,7 @@ public class ConnectTimeoutHandler extends ReadTimeoutHandler {
         }
     }
 
-    private ServiceUnavailableException unableToConnectError() {
-        return new ServiceUnavailableException("Unable to establish connection in " + timeoutMillis + "ms");
+    private BoltServiceUnavailableException unableToConnectError() {
+        return new BoltServiceUnavailableException("Unable to establish connection in " + timeoutMillis + "ms");
     }
 }

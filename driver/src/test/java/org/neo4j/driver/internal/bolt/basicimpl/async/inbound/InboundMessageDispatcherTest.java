@@ -49,10 +49,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
 import org.neo4j.driver.internal.bolt.api.GqlError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelErrorLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.Message;
@@ -351,8 +351,8 @@ class InboundMessageDispatcherTest {
 
     @SuppressWarnings("SameParameterValue")
     private static void verifyFailure(
-            ResponseHandler handler, String code, String message, Class<? extends Neo4jException> exceptionCls) {
-        var captor = ArgumentCaptor.forClass(Neo4jException.class);
+            ResponseHandler handler, String code, String message, Class<? extends BoltFailureException> exceptionCls) {
+        var captor = ArgumentCaptor.forClass(BoltFailureException.class);
         verify(handler).onFailure(captor.capture());
         var value = captor.getValue();
         assertEquals(code, value.code());

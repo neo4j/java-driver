@@ -24,10 +24,9 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 
 public class ChannelConnectedListener implements ChannelFutureListener {
@@ -60,10 +59,8 @@ public class ChannelConnectedListener implements ChannelFutureListener {
             channel.writeAndFlush(BoltProtocolUtil.handshakeBuf()).addListener(f -> {
                 if (!f.isSuccess()) {
                     var error = f.cause();
-                    if (error instanceof SSLHandshakeException) {
-                        error = new SecurityException("Failed to establish secured connection with the server", error);
-                    } else {
-                        error = new ServiceUnavailableException(
+                    if (!(error instanceof SSLHandshakeException)) {
+                        error = new BoltServiceUnavailableException(
                                 String.format("Unable to write Bolt handshake to %s.", this.address), error);
                     }
                     this.handshakeCompletedFuture.completeExceptionally(error);
@@ -75,7 +72,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
     }
 
     private static Throwable databaseUnavailableError(BoltServerAddress address, Throwable cause) {
-        return new ServiceUnavailableException(
+        return new BoltServiceUnavailableException(
                 format(
                         "Unable to connect to %s, ensure the database is running and that there "
                                 + "is a working network connection to it.",

@@ -26,16 +26,15 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
@@ -121,12 +120,12 @@ public interface BoltProtocol {
     CompletionStage<Void> reset(Connection connection, MessageHandler<Void> handler);
 
     default CompletionStage<Void> logoff(Connection connection, MessageHandler<Void> handler) {
-        return CompletableFuture.failedStage(new UnsupportedFeatureException("logoff not supported"));
+        return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("logoff not supported"));
     }
 
     default CompletionStage<Void> logon(
             Connection connection, Map<String, Value> authMap, Clock clock, MessageHandler<Void> handler) {
-        return CompletableFuture.failedStage(new UnsupportedFeatureException("logon not supported"));
+        return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("logon not supported"));
     }
 
     /**
@@ -169,13 +168,6 @@ public interface BoltProtocol {
         } else if (BoltProtocolV57.VERSION.equals(version)) {
             return BoltProtocolV57.INSTANCE;
         }
-        var message = "Unknown protocol version: " + version;
-        throw new ClientException(
-                GqlStatusError.UNKNOWN.getStatus(),
-                GqlStatusError.UNKNOWN.getStatusDescription(message),
-                "N/A",
-                message,
-                GqlStatusError.DIAGNOSTIC_RECORD,
-                null);
+        throw new BoltClientException("Unknown protocol version: " + version);
     }
 }

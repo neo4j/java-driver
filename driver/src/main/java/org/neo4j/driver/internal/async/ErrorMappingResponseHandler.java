@@ -18,12 +18,12 @@ package org.neo4j.driver.internal.async;
 
 import java.util.Objects;
 import java.util.function.Function;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 
 final class ErrorMappingResponseHandler extends DelegatingResponseHandler {
     private final Function<Throwable, Throwable> errorMapper;
 
-    ErrorMappingResponseHandler(ResponseHandler delegate, Function<Throwable, Throwable> errorMapper) {
+    ErrorMappingResponseHandler(DriverResponseHandler delegate, Function<Throwable, Throwable> errorMapper) {
         super(delegate);
         this.errorMapper = Objects.requireNonNull(errorMapper);
     }

@@ -18,12 +18,12 @@ package org.neo4j.driver.internal.async;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 
 final class BoltConnectionWithCloseTracking extends DelegatingBoltConnection {
     private final AtomicBoolean open = new AtomicBoolean(true);
 
-    BoltConnectionWithCloseTracking(BoltConnection delegate) {
+    BoltConnectionWithCloseTracking(DriverBoltConnection delegate) {
         super(delegate);
     }
 

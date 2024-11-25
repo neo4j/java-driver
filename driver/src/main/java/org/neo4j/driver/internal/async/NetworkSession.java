@@ -55,14 +55,14 @@ import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.DatabaseBookmark;
 import org.neo4j.driver.internal.FailableCursor;
 import org.neo4j.driver.internal.NotificationConfigMapper;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
@@ -79,7 +79,7 @@ import org.neo4j.driver.internal.util.Futures;
 
 public class NetworkSession {
     private final BoltSecurityPlanManager securityPlanManager;
-    private final BoltConnectionProvider boltConnectionProvider;
+    private final DriverBoltConnectionProvider boltConnectionProvider;
     private final NetworkSessionConnectionContext connectionContext;
     private final AccessMode mode;
     private final RetryLogic retryLogic;
@@ -102,7 +102,7 @@ public class NetworkSession {
 
     public NetworkSession(
             BoltSecurityPlanManager securityPlanManager,
-            BoltConnectionProvider boltConnectionProvider,
+            DriverBoltConnectionProvider boltConnectionProvider,
             RetryLogic retryLogic,
             DatabaseName databaseName,
             AccessMode mode,
@@ -319,7 +319,7 @@ public class NetworkSession {
                         var future = new CompletableFuture<Void>();
                         return connection
                                 .reset()
-                                .thenCompose(conn -> conn.flush(new ResponseHandler() {
+                                .thenCompose(conn -> conn.flush(new DriverResponseHandler() {
                                     @Override
                                     public void onError(Throwable throwable) {
                                         future.completeExceptionally(throwable);
@@ -356,7 +356,7 @@ public class NetworkSession {
         });
     }
 
-    public CompletionStage<BoltConnection> connectionAsync() {
+    public CompletionStage<DriverBoltConnection> connectionAsync() {
         return connectionStage.thenApply(Function.identity());
     }
 
@@ -465,7 +465,7 @@ public class NetworkSession {
                                     (name) -> connectionContext
                                             .databaseNameFuture()
                                             .complete(name == null ? DatabaseNameUtil.defaultDatabase() : name))
-                            .thenApply(connection -> (BoltConnection) new BoltConnectionWithAuthTokenManager(
+                            .thenApply(connection -> (DriverBoltConnection) new BoltConnectionWithAuthTokenManager(
                                     connection,
                                     overrideAuthToken != null
                                             ? new AuthTokenManager() {
@@ -647,10 +647,10 @@ public class NetworkSession {
         }
     }
 
-    public static class RunRxResponseHandler implements ResponseHandler {
+    public static class RunRxResponseHandler implements DriverResponseHandler {
         final CompletableFuture<RxResultCursor> cursorFuture = new CompletableFuture<>();
         private final Logging logging;
-        private final BoltConnection connection;
+        private final DriverBoltConnection connection;
         private final Query query;
         private final Consumer<DatabaseBookmark> bookmarkConsumer;
         private final AtomicBoolean runFailed;
@@ -660,7 +660,7 @@ public class NetworkSession {
 
         public RunRxResponseHandler(
                 Logging logging,
-                BoltConnection connection,
+                DriverBoltConnection connection,
                 Query query,
                 Consumer<DatabaseBookmark> bookmarkConsumer,
                 AtomicBoolean runFailed) {

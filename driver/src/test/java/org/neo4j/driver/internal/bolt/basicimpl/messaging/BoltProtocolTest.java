@@ -24,8 +24,8 @@ import static org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelA
 
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v3.BoltProtocolV3;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v4.BoltProtocolV4;
 import org.neo4j.driver.internal.bolt.basicimpl.messaging.v41.BoltProtocolV41;
@@ -47,11 +47,11 @@ class BoltProtocolTest {
     void shouldThrowForUnknownVersion() {
         assertAll(
                 () -> assertThrows(
-                        ClientException.class, () -> BoltProtocol.forVersion(new BoltProtocolVersion(42, 0))),
+                        BoltClientException.class, () -> BoltProtocol.forVersion(new BoltProtocolVersion(42, 0))),
                 () -> assertThrows(
-                        ClientException.class, () -> BoltProtocol.forVersion(new BoltProtocolVersion(142, 0))),
+                        BoltClientException.class, () -> BoltProtocol.forVersion(new BoltProtocolVersion(142, 0))),
                 () -> assertThrows(
-                        ClientException.class, () -> BoltProtocol.forVersion(new BoltProtocolVersion(-1, 0))));
+                        BoltClientException.class, () -> BoltProtocol.forVersion(new BoltProtocolVersion(-1, 0))));
     }
 
     @Test
@@ -59,6 +59,6 @@ class BoltProtocolTest {
         var channel = new EmbeddedChannel();
         setProtocolVersion(channel, new BoltProtocolVersion(42, 0));
 
-        assertThrows(ClientException.class, () -> BoltProtocol.forChannel(channel));
+        assertThrows(BoltClientException.class, () -> BoltProtocol.forChannel(channel));
     }
 }

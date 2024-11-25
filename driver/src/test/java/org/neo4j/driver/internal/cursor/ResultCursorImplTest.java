@@ -42,10 +42,10 @@ import org.neo4j.driver.Value;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.NoSuchRecordException;
 import org.neo4j.driver.internal.DatabaseBookmark;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.bolt.basicimpl.handlers.PullResponseHandlerImpl;
@@ -54,10 +54,7 @@ class ResultCursorImplTest {
     ResultCursorImpl cursor;
 
     @Mock
-    BoltConnection connection;
-
-    @Mock
-    Consumer<Throwable> throwableConsumer;
+    DriverBoltConnection connection;
 
     @Mock
     Consumer<DatabaseBookmark> bookmarkConsumer;
@@ -86,7 +83,7 @@ class ResultCursorImplTest {
         cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onRecord(new Value[0]);
             return CompletableFuture.completedStage(null);
         });
@@ -140,7 +137,7 @@ class ResultCursorImplTest {
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onRecord(new Value[0]);
             var pullSummary = mock(PullSummary.class);
             given(pullSummary.hasMore()).willReturn(true);
@@ -161,7 +158,7 @@ class ResultCursorImplTest {
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onError(error);
             handler.onComplete();
             return CompletableFuture.completedStage(null);
@@ -194,7 +191,7 @@ class ResultCursorImplTest {
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             for (var i = 0; i < fetchSize; i++) {
                 handler.onRecord(new Value[0]);
             }
@@ -219,7 +216,7 @@ class ResultCursorImplTest {
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onRecord(new Value[0]);
             var pullSummary = mock(PullSummary.class);
             handler.onPullSummary(pullSummary);
@@ -238,7 +235,7 @@ class ResultCursorImplTest {
         given(connection.pull(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onError(error);
             handler.onComplete();
             return CompletableFuture.completedStage(null);
@@ -272,7 +269,7 @@ class ResultCursorImplTest {
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onError(error);
             handler.onComplete();
             return CompletableFuture.completedStage(null);
@@ -306,7 +303,7 @@ class ResultCursorImplTest {
         given(connection.discard(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onError(error);
             handler.onComplete();
             return CompletableFuture.completedStage(null);

@@ -16,25 +16,17 @@
  */
 package org.neo4j.driver.internal.bolt.basicimpl.messaging.request;
 
-import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
 
 public final class MultiDatabaseUtil {
     public static void assertEmptyDatabaseName(DatabaseName databaseName, BoltProtocolVersion boltVersion) {
         if (databaseName.databaseName().isPresent()) {
-            var message = String.format(
+            throw new BoltClientException(String.format(
                     "Database name parameter for selecting database is not supported in Bolt Protocol Version %s. "
                             + "Database name: '%s'",
-                    boltVersion, databaseName.description());
-            throw new ClientException(
-                    GqlStatusError.UNKNOWN.getStatus(),
-                    GqlStatusError.UNKNOWN.getStatusDescription(message),
-                    "N/A",
-                    message,
-                    GqlStatusError.DIAGNOSTIC_RECORD,
-                    null);
+                    boltVersion, databaseName.description()));
         }
     }
 }

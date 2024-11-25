@@ -19,19 +19,9 @@ package org.neo4j.driver.internal.util;
 import java.io.Serial;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
-import org.neo4j.driver.exceptions.AuthenticationException;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.DatabaseException;
-import org.neo4j.driver.exceptions.FatalDiscoveryException;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.ResultConsumedException;
-import org.neo4j.driver.exceptions.SecurityException;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.TokenExpiredException;
-import org.neo4j.driver.exceptions.TransactionTerminatedException;
-import org.neo4j.driver.exceptions.TransientException;
-import org.neo4j.driver.internal.bolt.api.GqlError;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 
 public final class ErrorUtil {
@@ -54,138 +44,6 @@ public final class ErrorUtil {
         return new ResultConsumedException(
                 "Cannot access records on this result any more as the result has already been consumed "
                         + "or the query runner where the result is created has already been closed.");
-    }
-
-    public static Neo4jException newNeo4jError(GqlError gqlError) {
-        var code = gqlError.code();
-        switch (extractErrorClass(code)) {
-            case "ClientError" -> {
-                if ("Security".equals(extractErrorSubClass(code))) {
-                    if (code.equalsIgnoreCase("Neo.ClientError.Security.Unauthorized")) {
-                        return new AuthenticationException(
-                                gqlError.gqlStatus(),
-                                gqlError.statusDescription(),
-                                code,
-                                gqlError.message(),
-                                gqlError.diagnosticRecord(),
-                                map(gqlError.cause()));
-                    } else if (code.equalsIgnoreCase("Neo.ClientError.Security.AuthorizationExpired")) {
-                        return new AuthorizationExpiredException(
-                                gqlError.gqlStatus(),
-                                gqlError.statusDescription(),
-                                code,
-                                gqlError.message(),
-                                gqlError.diagnosticRecord(),
-                                map(gqlError.cause()));
-                    } else if (code.equalsIgnoreCase("Neo.ClientError.Security.TokenExpired")) {
-                        return new TokenExpiredException(
-                                gqlError.gqlStatus(),
-                                gqlError.statusDescription(),
-                                code,
-                                gqlError.message(),
-                                gqlError.diagnosticRecord(),
-                                map(gqlError.cause()));
-                    } else {
-                        return new SecurityException(
-                                gqlError.gqlStatus(),
-                                gqlError.statusDescription(),
-                                code,
-                                gqlError.message(),
-                                gqlError.diagnosticRecord(),
-                                map(gqlError.cause()));
-                    }
-                } else {
-                    if (code.equalsIgnoreCase("Neo.ClientError.Database.DatabaseNotFound")) {
-                        return new FatalDiscoveryException(
-                                gqlError.gqlStatus(),
-                                gqlError.statusDescription(),
-                                code,
-                                gqlError.message(),
-                                gqlError.diagnosticRecord(),
-                                map(gqlError.cause()));
-                    } else if (code.equalsIgnoreCase("Neo.ClientError.Transaction.Terminated")) {
-                        return new TransactionTerminatedException(
-                                gqlError.gqlStatus(),
-                                gqlError.statusDescription(),
-                                code,
-                                gqlError.message(),
-                                gqlError.diagnosticRecord(),
-                                map(gqlError.cause()));
-                    } else {
-                        return new ClientException(
-                                gqlError.gqlStatus(),
-                                gqlError.statusDescription(),
-                                code,
-                                gqlError.message(),
-                                gqlError.diagnosticRecord(),
-                                map(gqlError.cause()));
-                    }
-                }
-            }
-            case "TransientError" -> {
-                // Since 5.0 these 2 errors have been moved to ClientError class.
-                // This mapping is required if driver is connection to earlier server versions.
-                if ("Neo.TransientError.Transaction.Terminated".equals(code)) {
-                    return new TransactionTerminatedException(
-                            gqlError.gqlStatus(),
-                            gqlError.statusDescription(),
-                            "Neo.ClientError.Transaction.Terminated",
-                            gqlError.message(),
-                            gqlError.diagnosticRecord(),
-                            map(gqlError.cause()));
-                } else if ("Neo.TransientError.Transaction.LockClientStopped".equals(code)) {
-                    return new ClientException(
-                            gqlError.gqlStatus(),
-                            gqlError.statusDescription(),
-                            "Neo.ClientError.Transaction.LockClientStopped",
-                            gqlError.message(),
-                            gqlError.diagnosticRecord(),
-                            map(gqlError.cause()));
-                } else {
-                    return new TransientException(
-                            gqlError.gqlStatus(),
-                            gqlError.statusDescription(),
-                            code,
-                            gqlError.message(),
-                            gqlError.diagnosticRecord(),
-                            map(gqlError.cause()));
-                }
-            }
-            default -> {
-                return new DatabaseException(
-                        gqlError.gqlStatus(),
-                        gqlError.statusDescription(),
-                        code,
-                        gqlError.message(),
-                        gqlError.diagnosticRecord(),
-                        map(gqlError.cause()));
-            }
-        }
-    }
-
-    public static Neo4jException map(GqlError gqlError) {
-        if (gqlError == null) {
-            return null;
-        } else {
-            return new Neo4jException(
-                    gqlError.gqlStatus(),
-                    gqlError.statusDescription(),
-                    gqlError.code(),
-                    gqlError.message(),
-                    gqlError.diagnosticRecord(),
-                    map(gqlError.cause()));
-        }
-    }
-
-    public static boolean isFatal(Throwable error) {
-        if (error instanceof Neo4jException) {
-            if (isProtocolViolationError(((Neo4jException) error))) {
-                return true;
-            }
-
-            return !isClientOrTransientError(((Neo4jException) error));
-        }
-        return true;
     }
 
     public static void rethrowAsyncException(ExecutionException e) {
@@ -213,32 +71,6 @@ public final class ErrorUtil {
                     error);
         }
         throw exception;
-    }
-
-    private static boolean isProtocolViolationError(Neo4jException error) {
-        var errorCode = error.code();
-        return errorCode != null && errorCode.startsWith("Neo.ClientError.Request");
-    }
-
-    private static boolean isClientOrTransientError(Neo4jException error) {
-        var errorCode = error.code();
-        return errorCode != null && (errorCode.contains("ClientError") || errorCode.contains("TransientError"));
-    }
-
-    private static String extractErrorClass(String code) {
-        var parts = code.split("\\.");
-        if (parts.length < 2) {
-            return "";
-        }
-        return parts[1];
-    }
-
-    private static String extractErrorSubClass(String code) {
-        var parts = code.split("\\.");
-        if (parts.length < 3) {
-            return "";
-        }
-        return parts[2];
     }
 
     public static void addSuppressed(Throwable mainError, Throwable error) {
