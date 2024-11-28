@@ -22,6 +22,7 @@ public class Scheme {
     public static final String BOLT_URI_SCHEME = "bolt";
     public static final String BOLT_HIGH_TRUST_URI_SCHEME = "bolt+s";
     public static final String BOLT_LOW_TRUST_URI_SCHEME = "bolt+ssc";
+    public static final String BOLT_UNIX_URI_SCHEME = "bolt+unix";
     public static final String NEO4J_URI_SCHEME = "neo4j";
     public static final String NEO4J_HIGH_TRUST_URI_SCHEME = "neo4j+s";
     public static final String NEO4J_LOW_TRUST_URI_SCHEME = "neo4j+ssc";
@@ -34,6 +35,7 @@ public class Scheme {
             case BOLT_URI_SCHEME,
                     BOLT_LOW_TRUST_URI_SCHEME,
                     BOLT_HIGH_TRUST_URI_SCHEME,
+                    BOLT_UNIX_URI_SCHEME,
                     NEO4J_URI_SCHEME,
                     NEO4J_LOW_TRUST_URI_SCHEME,
                     NEO4J_HIGH_TRUST_URI_SCHEME -> {}

@@ -19,6 +19,7 @@ package org.neo4j.driver.internal.bolt.api;
 import static java.util.Objects.requireNonNull;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -35,6 +36,7 @@ public class BoltServerAddress {
     // resolved IP address.
     protected final int port;
     private final String stringValue;
+    private final Path path;
 
     public BoltServerAddress(String address) {
         this(uriFrom(address));
@@ -55,6 +57,15 @@ public class BoltServerAddress {
         this.stringValue = host.equals(connectionHost)
                 ? String.format("%s:%d", host, port)
                 : String.format("%s(%s):%d", host, connectionHost, port);
+        this.path = null;
+    }
+
+    public BoltServerAddress(Path path) {
+        this.host = path.toString();
+        this.connectionHost = this.host;
+        this.port = -1;
+        this.stringValue = this.host;
+        this.path = path;
     }
 
     @Override
@@ -91,6 +102,10 @@ public class BoltServerAddress {
         return connectionHost;
     }
 
+    public Path path() {
+        return path;
+    }
+
     /**
      * Create a stream of unicast addresses.
      * <p>
@@ -115,7 +130,6 @@ public class BoltServerAddress {
         return port == -1 ? DEFAULT_PORT : port;
     }
 
-    @SuppressWarnings("DuplicatedCode")
     private static URI uriFrom(String address) {
         String scheme;
         String hostPort;
