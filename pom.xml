@@ -5,7 +5,7 @@
 
   <groupId>org.neo4j.driver</groupId>
   <artifactId>neo4j-java-driver-parent</artifactId>
-  <version>5.26-SNAPSHOT</version>
+  <version>5.27-SNAPSHOT</version>
 
   <packaging>pom</packaging>
   <name>Neo4j Java Driver Project</name>
@@ -59,9 +59,9 @@
     <svm.version>24.1.1</svm.version>
     <micrometer.version>1.13.8</micrometer.version>
     <blockhound.version>1.0.10.RELEASE</blockhound.version>
-    <testcontainers.version>1.20.3</testcontainers.version>
+    <testcontainers.version>1.20.4</testcontainers.version>
     <archunit-junit5.version>1.3.0</archunit-junit5.version>
-    <build-resources.version>5.18.1</build-resources.version>
+    <build-resources.version>2024-11.1</build-resources.version>
     <!-- To be overwritten by child projects -->
     <moduleName/>
   </properties>
@@ -515,7 +515,7 @@
           <dependencies>
             <dependency>
               <groupId>org.neo4j.build</groupId>
-              <artifactId>build-resources</artifactId>
+              <artifactId>resources</artifactId>
               <version>${build-resources.version}</version>
             </dependency>
           </dependencies>
@@ -528,7 +528,7 @@
             <failIfDisliked>true</failIfDisliked>
             <failIfMissing>true</failIfMissing>
             <plainTextReport>true</plainTextReport>
-            <prependText>licensing/notice-apache2-prefix.txt</prependText>
+            <prependText>license/neo4j_apache_v2/notice.txt</prependText>
             <excludedGroups>
               ^((org.neo4j.driver){1})$
             </excludedGroups>
@@ -557,7 +557,7 @@
           <dependencies>
             <dependency>
               <groupId>org.neo4j.build</groupId>
-              <artifactId>build-resources</artifactId>
+              <artifactId>resources</artifactId>
               <version>${build-resources.version}</version>
             </dependency>
           </dependencies>
