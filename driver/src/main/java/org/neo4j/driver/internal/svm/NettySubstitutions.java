@@ -31,25 +31,12 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.DefaultChannelPromise;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolConfig.SelectorFailureBehavior;
-import io.netty.handler.ssl.CipherSuiteFilter;
-import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkAlpnApplicationProtocolNegotiator;
 import io.netty.handler.ssl.JdkApplicationProtocolNegotiator;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextOption;
-import io.netty.handler.ssl.SslProvider;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.JdkLoggerFactory;
-import java.security.PrivateKey;
-import java.security.Provider;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
-import java.util.Map;
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLException;
-import javax.net.ssl.TrustManagerFactory;
 
 /**
  * This substitution avoid having loggers added to the build
@@ -65,55 +52,6 @@ final class Target_io_netty_util_internal_logging_InternalLoggerFactory {
 
 // SSL
 // This whole section is mostly about removing static analysis references to openssl/tcnative
-
-@TargetClass(className = "io.netty.handler.ssl.JdkSslServerContext")
-final class Target_io_netty_handler_ssl_JdkSslServerContext {
-
-    @Alias
-    Target_io_netty_handler_ssl_JdkSslServerContext(
-            Provider provider,
-            X509Certificate[] trustCertCollection,
-            TrustManagerFactory trustManagerFactory,
-            X509Certificate[] keyCertChain,
-            PrivateKey key,
-            String keyPassword,
-            KeyManagerFactory keyManagerFactory,
-            Iterable<String> ciphers,
-            CipherSuiteFilter cipherFilter,
-            ApplicationProtocolConfig apn,
-            long sessionCacheSize,
-            long sessionTimeout,
-            ClientAuth clientAuth,
-            String[] protocols,
-            boolean startTls,
-            SecureRandom secureRandom,
-            String keyStore)
-            throws SSLException {}
-}
-
-@TargetClass(className = "io.netty.handler.ssl.JdkSslClientContext")
-final class Target_io_netty_handler_ssl_JdkSslClientContext {
-
-    @Alias
-    Target_io_netty_handler_ssl_JdkSslClientContext(
-            Provider sslContextProvider,
-            X509Certificate[] trustCertCollection,
-            TrustManagerFactory trustManagerFactory,
-            X509Certificate[] keyCertChain,
-            PrivateKey key,
-            String keyPassword,
-            KeyManagerFactory keyManagerFactory,
-            Iterable<String> ciphers,
-            CipherSuiteFilter cipherFilter,
-            ApplicationProtocolConfig apn,
-            String[] protocols,
-            long sessionCacheSize,
-            long sessionTimeout,
-            SecureRandom secureRandom,
-            String keyStoreType)
-            throws SSLException {}
-}
-
 @TargetClass(className = "io.netty.handler.ssl.SslHandler$SslEngineType")
 final class Target_io_netty_handler_ssl_SslHandler$SslEngineType {
 
@@ -194,99 +132,6 @@ final class Target_io_netty_handler_ssl_JdkAlpnSslEngine {
             final SSLEngine engine,
             final JdkApplicationProtocolNegotiator applicationNegotiator,
             final boolean isServer) {}
-}
-
-@TargetClass(className = "io.netty.handler.ssl.SslContext")
-final class Target_io_netty_handler_ssl_SslContext {
-
-    @Substitute
-    static SslContext newServerContextInternal(
-            SslProvider provider,
-            Provider sslContextProvider,
-            X509Certificate[] trustCertCollection,
-            TrustManagerFactory trustManagerFactory,
-            X509Certificate[] keyCertChain,
-            PrivateKey key,
-            String keyPassword,
-            KeyManagerFactory keyManagerFactory,
-            Iterable<String> ciphers,
-            CipherSuiteFilter cipherFilter,
-            ApplicationProtocolConfig apn,
-            long sessionCacheSize,
-            long sessionTimeout,
-            ClientAuth clientAuth,
-            String[] protocols,
-            boolean startTls,
-            boolean enableOcsp,
-            SecureRandom secureRandom,
-            String keyStoreType,
-            Map.Entry<SslContextOption<?>, Object>... ctxOptions)
-            throws SSLException {
-
-        if (enableOcsp) {
-            throw new IllegalArgumentException("OCSP is not supported with this SslProvider: " + provider);
-        }
-        return (SslContext) (Object) new Target_io_netty_handler_ssl_JdkSslServerContext(
-                sslContextProvider,
-                trustCertCollection,
-                trustManagerFactory,
-                keyCertChain,
-                key,
-                keyPassword,
-                keyManagerFactory,
-                ciphers,
-                cipherFilter,
-                apn,
-                sessionCacheSize,
-                sessionTimeout,
-                clientAuth,
-                protocols,
-                startTls,
-                secureRandom,
-                keyStoreType);
-    }
-
-    @Substitute
-    static SslContext newClientContextInternal(
-            SslProvider provider,
-            Provider sslContextProvider,
-            X509Certificate[] trustCert,
-            TrustManagerFactory trustManagerFactory,
-            X509Certificate[] keyCertChain,
-            PrivateKey key,
-            String keyPassword,
-            KeyManagerFactory keyManagerFactory,
-            Iterable<String> ciphers,
-            CipherSuiteFilter cipherFilter,
-            ApplicationProtocolConfig apn,
-            String[] protocols,
-            long sessionCacheSize,
-            long sessionTimeout,
-            boolean enableOcsp,
-            SecureRandom secureRandom,
-            String keyStoreType,
-            Map.Entry<SslContextOption<?>, Object>... options)
-            throws SSLException {
-        if (enableOcsp) {
-            throw new IllegalArgumentException("OCSP is not supported with this SslProvider: " + provider);
-        }
-        return (SslContext) (Object) new Target_io_netty_handler_ssl_JdkSslClientContext(
-                sslContextProvider,
-                trustCert,
-                trustManagerFactory,
-                keyCertChain,
-                key,
-                keyPassword,
-                keyManagerFactory,
-                ciphers,
-                cipherFilter,
-                apn,
-                protocols,
-                sessionCacheSize,
-                sessionTimeout,
-                secureRandom,
-                keyStoreType);
-    }
 }
 
 @TargetClass(className = "io.netty.handler.ssl.JdkDefaultApplicationProtocolNegotiator")
