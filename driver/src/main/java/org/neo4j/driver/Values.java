@@ -40,10 +40,11 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.AsValue;
+import org.neo4j.driver.internal.GqlStatusError;
 import org.neo4j.driver.internal.InternalIsoDuration;
 import org.neo4j.driver.internal.InternalPoint2D;
 import org.neo4j.driver.internal.InternalPoint3D;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.value.BoltValue;
 import org.neo4j.driver.internal.value.BooleanValue;
 import org.neo4j.driver.internal.value.BytesValue;
 import org.neo4j.driver.internal.value.DateTimeValue;
@@ -103,6 +104,9 @@ public final class Values {
             return NullValue.NULL;
         }
 
+        if (value instanceof BoltValue boltValue) {
+            return boltValue.asDriverValue();
+        }
         if (value instanceof AsValue) {
             return ((AsValue) value).asValue();
         }

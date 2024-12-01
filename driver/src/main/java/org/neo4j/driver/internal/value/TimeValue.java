@@ -34,4 +34,9 @@ public class TimeValue extends ObjectValueAdapter<OffsetTime> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.TIME();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.TIME);
+    }
 }

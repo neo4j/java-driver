@@ -34,4 +34,9 @@ public class PointValue extends ObjectValueAdapter<Point> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.POINT();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.POINT);
+    }
 }

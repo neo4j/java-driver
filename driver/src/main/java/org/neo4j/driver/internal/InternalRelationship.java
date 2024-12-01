@@ -25,7 +25,8 @@ import org.neo4j.driver.types.Relationship;
 /**
  * {@link Relationship} implementation that directly contains type and properties.
  */
-public class InternalRelationship extends InternalEntity implements Relationship {
+public class InternalRelationship extends InternalEntity
+        implements Relationship, org.neo4j.driver.internal.bolt.api.values.Relationship {
     private long start;
     private String startElementId;
     private long end;

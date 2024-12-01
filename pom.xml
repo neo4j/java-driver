@@ -67,6 +67,11 @@
   </properties>
 
   <modules>
+    <module>bolt-api</module>
+    <module>bolt-api-test-values</module>
+    <module>bolt-api-netty</module>
+    <module>bolt-api-pooled</module>
+    <module>bolt-api-routed</module>
     <module>driver</module>
     <module>bundle</module>
     <module>examples</module>

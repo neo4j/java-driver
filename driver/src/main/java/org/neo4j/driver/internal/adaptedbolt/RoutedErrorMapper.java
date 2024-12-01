@@ -21,9 +21,9 @@ import static java.lang.String.format;
 import java.util.Objects;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.exceptions.SessionExpiredException;
+import org.neo4j.driver.internal.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 

@@ -19,8 +19,6 @@ package org.neo4j.driver.testutil;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toList;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -36,7 +34,6 @@ import static org.neo4j.driver.SessionConfig.forDatabase;
 import static org.neo4j.driver.internal.bolt.api.DatabaseNameUtil.defaultDatabase;
 import static org.neo4j.driver.internal.logging.DevNullLogging.DEV_NULL_LOGGING;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.util.internal.PlatformDependent;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -49,7 +46,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -76,15 +72,12 @@ import org.neo4j.driver.internal.NoOpBookmarkManager;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.summary.PullSummary;
 import org.neo4j.driver.internal.async.NetworkSession;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
-import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
-import org.neo4j.driver.internal.bolt.basicimpl.async.connection.EventLoopGroupFactory;
-import org.neo4j.driver.internal.bolt.basicimpl.messaging.BoltProtocol;
-import org.neo4j.driver.internal.bolt.basicimpl.messaging.v4.BoltProtocolV4;
 import org.neo4j.driver.internal.retry.RetryLogic;
 import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
 import org.neo4j.driver.internal.util.FixedRetryLogic;
@@ -93,9 +86,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public final class TestUtil {
-    public static final BoltProtocolVersion DEFAULT_TEST_PROTOCOL_VERSION = BoltProtocolV4.VERSION;
-    public static final BoltProtocol DEFAULT_TEST_PROTOCOL = BoltProtocol.forVersion(DEFAULT_TEST_PROTOCOL_VERSION);
-
     private static final long DEFAULT_WAIT_TIME_MS = MINUTES.toMillis(100);
     private static final String ALPHANUMERICS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789";
     public static final Duration TX_TIMEOUT_TEST_TIMEOUT = Duration.ofSeconds(10);
@@ -107,12 +97,12 @@ public final class TestUtil {
     }
 
     public static <T> T await(Mono<T> publisher) {
-        EventLoopGroupFactory.assertNotInEventLoopThread();
+        //        EventLoopGroupFactory.assertNotInEventLoopThread();
         return publisher.block(Duration.ofMillis(DEFAULT_WAIT_TIME_MS));
     }
 
     public static <T> List<T> await(Flux<T> publisher) {
-        EventLoopGroupFactory.assertNotInEventLoopThread();
+        //        EventLoopGroupFactory.assertNotInEventLoopThread();
         return publisher.collectList().block(Duration.ofMillis(DEFAULT_WAIT_TIME_MS));
     }
 
@@ -140,37 +130,6 @@ public final class TestUtil {
         } catch (TimeoutException e) {
             throw new AssertionError("Given future did not complete in time: " + future);
         }
-    }
-
-    public static void assertByteBufContains(ByteBuf buf, Number... values) {
-        try {
-            assertNotNull(buf);
-            var expectedReadableBytes =
-                    Arrays.stream(values).mapToInt(TestUtil::bytesCount).sum();
-            assertEquals(expectedReadableBytes, buf.readableBytes(), "Unexpected number of bytes");
-            for (var expectedValue : values) {
-                var actualValue = read(buf, expectedValue.getClass());
-                var valueType = actualValue.getClass().getSimpleName();
-                assertEquals(expectedValue, actualValue, valueType + " values not equal");
-            }
-        } finally {
-            releaseIfPossible(buf);
-        }
-    }
-
-    public static void assertByteBufEquals(ByteBuf expected, ByteBuf actual) {
-        try {
-            assertEquals(expected, actual);
-        } finally {
-            releaseIfPossible(expected);
-            releaseIfPossible(actual);
-        }
-    }
-
-    @SafeVarargs
-    @SuppressWarnings("varargs")
-    public static <T> Set<T> asOrderedSet(T... elements) {
-        return new LinkedHashSet<>(Arrays.asList(elements));
     }
 
     @SafeVarargs
@@ -491,48 +450,6 @@ public final class TestUtil {
             var result = tx.run("MATCH (n) WITH n LIMIT 1000 DETACH DELETE n RETURN count(n)");
             return result.single().get(0).asInt();
         });
-    }
-
-    private static Number read(ByteBuf buf, Class<? extends Number> type) {
-        if (type == Byte.class) {
-            return buf.readByte();
-        } else if (type == Short.class) {
-            return buf.readShort();
-        } else if (type == Integer.class) {
-            return buf.readInt();
-        } else if (type == Long.class) {
-            return buf.readLong();
-        } else if (type == Float.class) {
-            return buf.readFloat();
-        } else if (type == Double.class) {
-            return buf.readDouble();
-        } else {
-            throw new IllegalArgumentException("Unexpected numeric type: " + type);
-        }
-    }
-
-    private static int bytesCount(Number value) {
-        if (value instanceof Byte) {
-            return 1;
-        } else if (value instanceof Short) {
-            return 2;
-        } else if (value instanceof Integer) {
-            return 4;
-        } else if (value instanceof Long) {
-            return 8;
-        } else if (value instanceof Float) {
-            return 4;
-        } else if (value instanceof Double) {
-            return 8;
-        } else {
-            throw new IllegalArgumentException("Unexpected number: '" + value + "' or type" + value.getClass());
-        }
-    }
-
-    private static void releaseIfPossible(ByteBuf buf) {
-        if (buf.refCnt() > 0) {
-            buf.release();
-        }
     }
 
     public static <T extends Serializable> T serializeAndReadBack(T instance, Class<T> targetClass)

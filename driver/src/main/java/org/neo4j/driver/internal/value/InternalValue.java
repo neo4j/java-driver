@@ -22,4 +22,6 @@ import org.neo4j.driver.internal.types.TypeConstructor;
 
 public interface InternalValue extends Value, AsValue {
     TypeConstructor typeConstructor();
+
+    BoltValue asBoltValue();
 }

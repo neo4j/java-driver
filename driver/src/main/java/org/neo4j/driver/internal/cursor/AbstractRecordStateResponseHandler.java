@@ -18,7 +18,7 @@ package org.neo4j.driver.internal.cursor;
 
 import java.util.List;
 import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.GqlStatusError;
 import org.neo4j.driver.internal.summary.InternalGqlStatusObject;
 import org.neo4j.driver.summary.GqlStatusObject;
 

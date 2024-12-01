@@ -34,4 +34,9 @@ public class DurationValue extends ObjectValueAdapter<IsoDuration> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.DURATION();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.DURATION);
+    }
 }

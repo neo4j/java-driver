@@ -48,11 +48,11 @@ import org.neo4j.driver.internal.bolt.api.DefaultDomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
+import org.neo4j.driver.internal.bolt.basicimpl.BootstrapFactory;
 import org.neo4j.driver.internal.bolt.basicimpl.NettyBoltConnectionProvider;
-import org.neo4j.driver.internal.bolt.basicimpl.async.connection.BootstrapFactory;
 import org.neo4j.driver.internal.bolt.pooledimpl.PooledBoltConnectionProvider;
+import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutedBoltConnectionProvider;
-import org.neo4j.driver.internal.bolt.routedimpl.cluster.Rediscovery;
 import org.neo4j.driver.internal.metrics.DevNullMetricsProvider;
 import org.neo4j.driver.internal.metrics.InternalMetricsProvider;
 import org.neo4j.driver.internal.metrics.MetricsProvider;
@@ -63,6 +63,7 @@ import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
 import org.neo4j.driver.internal.security.SecurityPlan;
 import org.neo4j.driver.internal.security.SecurityPlans;
 import org.neo4j.driver.internal.util.DriverInfoUtil;
+import org.neo4j.driver.internal.value.BoltValueFactory;
 import org.neo4j.driver.net.ServerAddress;
 
 public class DriverFactory {
@@ -222,7 +223,7 @@ public class DriverFactory {
         if (uri.getScheme().startsWith("bolt")) {
             assertNoRoutingContext(uri, routingSettings);
             boltConnectionProvider = new AdaptingDriverBoltConnectionProvider(
-                    pooledBoltConnectionProviderSupplier.get(), errorMapper, false);
+                    pooledBoltConnectionProviderSupplier.get(), errorMapper, BoltValueFactory.getInstance(), false);
         } else {
             boltConnectionProvider = new AdaptingDriverBoltConnectionProvider(
                     createRoutedBoltConnectionProvider(
@@ -233,6 +234,7 @@ public class DriverFactory {
                             clock,
                             loggingProvider),
                     errorMapper,
+                    BoltValueFactory.getInstance(),
                     true);
         }
         return boltConnectionProvider;
@@ -273,7 +275,12 @@ public class DriverFactory {
     private BoltConnectionProvider createNettyBoltConnectionProvider(
             EventLoopGroup eventLoopGroup, Clock clock, LoggingProvider loggingProvider) {
         return new NettyBoltConnectionProvider(
-                eventLoopGroup, clock, getDomainNameResolver(), localAddress(), loggingProvider);
+                eventLoopGroup,
+                clock,
+                getDomainNameResolver(),
+                localAddress(),
+                loggingProvider,
+                BoltValueFactory.getInstance());
     }
 
     @SuppressWarnings("SameReturnValue")

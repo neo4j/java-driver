@@ -57,13 +57,13 @@ import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.InternalRecord;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.summary.PullSummary;
+import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
-import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RollbackSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
-import org.neo4j.driver.internal.bolt.basicimpl.messaging.v4.BoltProtocolV4;
 import org.neo4j.driver.internal.value.IntegerValue;
 
 class InternalAsyncTransactionTest {
@@ -72,7 +72,7 @@ class InternalAsyncTransactionTest {
 
     @BeforeEach
     void setUp() {
-        connection = connectionMock(BoltProtocolV4.INSTANCE.version());
+        connection = connectionMock(new BoltProtocolVersion(4, 0));
         given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         var connectionProvider = mock(DriverBoltConnectionProvider.class);
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))

@@ -1,11 +1,13 @@
 package-version=${version;===;${Bundle-Version}}
 
 Export-Package: \
- *;version="${package-version}"
+ !org.neo4j.driver.internal.*, \
+ org.neo4j.driver.*;version="${package-version}"
 
 Import-Package: \
+ !org.neo4j.driver.internal.*, \
  !io.netty.*, \
- !reactor.core.*, \
+ !reactor.*, \
  !com.oracle.svm.*, \
  javax.security.cert, \
  *

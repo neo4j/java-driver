@@ -26,7 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import org.neo4j.driver.internal.bolt.basicimpl.async.connection.EventLoopGroupFactory;
+import org.neo4j.driver.internal.bolt.basicimpl.EventLoopThread;
 
 public final class Futures {
     private static final CompletableFuture<?> COMPLETED_WITH_NULL = completedFuture(null);
@@ -43,7 +43,7 @@ public final class Futures {
     }
 
     public static <V> V blockingGet(CompletionStage<V> stage, Runnable interruptHandler) {
-        EventLoopGroupFactory.assertNotInEventLoopThread();
+        assertNotInEventLoopThread();
 
         Future<V> future = stage.toCompletableFuture();
         var interrupted = false;
@@ -136,6 +136,31 @@ public final class Futures {
                 future.complete(value);
             }
         };
+    }
+
+    /**
+     * Assert that current thread is not an event loop used for async IO operations. This check is needed because
+     * blocking API methods are implemented on top of corresponding async API methods. Deadlocks might happen when
+     * IO thread executes blocking API call and has to wait for itself to read from the network.
+     *
+     * @throws IllegalStateException when current thread is an event loop IO thread.
+     */
+    public static void assertNotInEventLoopThread() throws IllegalStateException {
+        if (isEventLoopThread(Thread.currentThread())) {
+            throw new IllegalStateException(
+                    "Blocking operation can't be executed in IO thread because it might result in a deadlock. "
+                            + "Please do not use blocking API when chaining futures returned by async API methods.");
+        }
+    }
+
+    /**
+     * Check if given thread is an event loop IO thread.
+     *
+     * @param thread the thread to check.
+     * @return {@code true} when given thread belongs to the event loop, {@code false} otherwise.
+     */
+    public static boolean isEventLoopThread(Thread thread) {
+        return thread instanceof EventLoopThread;
     }
 
     private static void safeRun(Runnable runnable) {

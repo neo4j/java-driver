@@ -16,29 +16,21 @@
  */
 package org.neo4j.driver.testutil;
 
-import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import org.neo4j.driver.Logger;
 import org.neo4j.driver.Logging;
-import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.InboundMessageDispatcher;
-import org.neo4j.driver.internal.bolt.basicimpl.async.outbound.OutboundMessageHandler;
 
 public class LoggingUtil {
     public static Logging boltLogging(List<String> messages) {
         var logging = mock(Logging.class);
-        var noopLogger = mock(Logger.class);
         var accumulatingLogger = mock(Logger.class);
-        given(logging.getLog(argThat(not(InboundMessageDispatcher.class)))).willReturn(noopLogger);
-        given(logging.getLog(argThat(not(OutboundMessageHandler.class)))).willReturn(noopLogger);
-        given(logging.getLog(InboundMessageDispatcher.class)).willReturn(accumulatingLogger);
-        given(logging.getLog(OutboundMessageHandler.class)).willReturn(accumulatingLogger);
+        given(logging.getLog(any(Class.class))).willReturn(accumulatingLogger);
         given(accumulatingLogger.isDebugEnabled()).willReturn(true);
         willAnswer(invocationOnMock -> {
                     var message = (String) invocationOnMock.getArgument(0);

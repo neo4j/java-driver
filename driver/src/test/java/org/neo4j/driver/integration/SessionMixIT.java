@@ -17,13 +17,11 @@
 package org.neo4j.driver.integration;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.neo4j.driver.Values.parameters;
-import static org.neo4j.driver.internal.util.Matchers.blockingOperationInEventLoopError;
 import static org.neo4j.driver.testutil.TestUtil.await;
 
 import java.util.concurrent.CompletionStage;
@@ -38,7 +36,7 @@ import org.neo4j.driver.TransactionConfig;
 import org.neo4j.driver.async.AsyncSession;
 import org.neo4j.driver.async.AsyncTransactionWork;
 import org.neo4j.driver.async.ResultCursor;
-import org.neo4j.driver.internal.bolt.basicimpl.async.connection.EventLoopGroupFactory;
+import org.neo4j.driver.internal.util.Futures;
 import org.neo4j.driver.testutil.DatabaseExtension;
 import org.neo4j.driver.testutil.ParallelizableIT;
 
@@ -77,9 +75,9 @@ class SessionMixIT {
         CompletionStage<Void> result = asyncSession
                 .beginTransactionAsync(TransactionConfig.empty())
                 .thenApply(tx -> {
-                    if (EventLoopGroupFactory.isEventLoopThread(Thread.currentThread())) {
+                    if (Futures.isEventLoopThread(Thread.currentThread())) {
                         var e = assertThrows(IllegalStateException.class, () -> session.run("CREATE ()"));
-                        assertThat(e, is(blockingOperationInEventLoopError()));
+                        assertTrue(e.getMessage().startsWith("Blocking operation can't be executed in IO thread"));
                     }
                     return null;
                 });
@@ -110,12 +108,11 @@ class SessionMixIT {
     @SuppressWarnings("deprecation")
     void shouldFailToExecuteBlockingRunInAsyncTransactionFunction() {
         AsyncTransactionWork<CompletionStage<Void>> completionStageTransactionWork = tx -> {
-            if (EventLoopGroupFactory.isEventLoopThread(Thread.currentThread())) {
+            if (Futures.isEventLoopThread(Thread.currentThread())) {
                 var e = assertThrows(
                         IllegalStateException.class,
                         () -> session.run("UNWIND range(1, 10000) AS x CREATE (n:AsyncNode {x: x}) RETURN n"));
-
-                assertThat(e, is(blockingOperationInEventLoopError()));
+                assertTrue(e.getMessage().startsWith("Blocking operation can't be executed in IO thread"));
             }
             return completedFuture(null);
         };
@@ -130,14 +127,13 @@ class SessionMixIT {
                 .runAsync("RETURN 1")
                 .thenCompose(ResultCursor::singleAsync)
                 .thenApply(record -> {
-                    if (EventLoopGroupFactory.isEventLoopThread(Thread.currentThread())) {
+                    if (Futures.isEventLoopThread(Thread.currentThread())) {
                         var e = assertThrows(
                                 IllegalStateException.class,
                                 () -> session.run(
                                         "RETURN $x",
                                         parameters("x", record.get(0).asInt())));
-
-                        assertThat(e, is(blockingOperationInEventLoopError()));
+                        assertTrue(e.getMessage().startsWith("Blocking operation can't be executed in IO thread"));
                     }
                     return null;
                 });

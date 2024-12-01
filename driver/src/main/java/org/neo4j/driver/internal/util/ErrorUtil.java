@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.ResultConsumedException;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.GqlStatusError;
 
 public final class ErrorUtil {
     private ErrorUtil() {}

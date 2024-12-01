@@ -45,7 +45,7 @@ import org.neo4j.driver.SessionConfig;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.async.LeakLoggingNetworkSession;
 import org.neo4j.driver.internal.async.NetworkSession;
-import org.neo4j.driver.internal.bolt.basicimpl.async.connection.BootstrapFactory;
+import org.neo4j.driver.internal.bolt.basicimpl.BootstrapFactory;
 import org.neo4j.driver.internal.metrics.DevNullMetricsProvider;
 import org.neo4j.driver.internal.metrics.InternalMetricsProvider;
 import org.neo4j.driver.internal.metrics.MicrometerMetricsProvider;

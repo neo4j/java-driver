@@ -31,8 +31,9 @@ import org.neo4j.driver.types.Relationship;
 /**
  * {@link Path} implementation that directly contains all nodes and relationships.
  */
-public class InternalPath implements Path, AsValue {
-    public record SelfContainedSegment(Node start, Relationship relationship, Node end) implements Segment {
+public class InternalPath implements Path, AsValue, org.neo4j.driver.internal.bolt.api.values.Path {
+    public record SelfContainedSegment(Node start, Relationship relationship, Node end)
+            implements Segment, org.neo4j.driver.internal.bolt.api.values.Segment {
 
         @Override
         public boolean equals(Object other) {

@@ -17,12 +17,12 @@
 package org.neo4j.driver.internal.adaptedbolt;
 
 import org.neo4j.driver.Value;
+import org.neo4j.driver.internal.adaptedbolt.summary.DiscardSummary;
+import org.neo4j.driver.internal.adaptedbolt.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
-import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
 import org.neo4j.driver.internal.bolt.api.summary.LogoffSummary;
 import org.neo4j.driver.internal.bolt.api.summary.LogonSummary;
-import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.ResetSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RollbackSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;

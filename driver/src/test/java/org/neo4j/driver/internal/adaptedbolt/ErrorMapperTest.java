@@ -21,6 +21,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
+import java.util.Collections;
 import javax.net.ssl.SSLHandshakeException;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.exceptions.AuthenticationException;
@@ -41,7 +42,7 @@ class ErrorMapperTest {
                 message,
                 GqlStatusError.UNKNOWN.getStatus(),
                 GqlStatusError.UNKNOWN.getStatusDescription(message),
-                GqlStatusError.DIAGNOSTIC_RECORD,
+                Collections.emptyMap(),
                 null);
     }
 

@@ -16,6 +16,8 @@
  */
 package org.neo4j.driver.internal.adaptedbolt;
 
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
@@ -30,14 +32,19 @@ import org.neo4j.driver.internal.bolt.api.summary.RollbackSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.bolt.api.summary.TelemetrySummary;
+import org.neo4j.driver.internal.value.BoltValue;
+import org.neo4j.driver.internal.value.BoltValueFactory;
 
 final class AdaptingDriverResponseHandler implements ResponseHandler {
     private final DriverResponseHandler delegate;
     private final ErrorMapper errorMapper;
+    private final BoltValueFactory boltValueFactory;
 
-    AdaptingDriverResponseHandler(DriverResponseHandler delegate, ErrorMapper errorMapper) {
+    AdaptingDriverResponseHandler(
+            DriverResponseHandler delegate, ErrorMapper errorMapper, BoltValueFactory boltValueFactory) {
         this.delegate = Objects.requireNonNull(delegate);
         this.errorMapper = Objects.requireNonNull(errorMapper);
+        this.boltValueFactory = Objects.requireNonNull(boltValueFactory);
     }
 
     @Override
@@ -56,18 +63,31 @@ final class AdaptingDriverResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
-        delegate.onRecord(fields);
+    public void onRecord(org.neo4j.driver.internal.bolt.api.values.Value[] fields) {
+        var mappedFields = Arrays.stream(fields)
+                .map(field -> ((BoltValue) field).asDriverValue())
+                .toArray(Value[]::new);
+        delegate.onRecord(mappedFields);
     }
 
     @Override
     public void onPullSummary(PullSummary summary) {
-        delegate.onPullSummary(summary);
+        delegate.onPullSummary(new org.neo4j.driver.internal.adaptedbolt.summary.PullSummary() {
+            @Override
+            public boolean hasMore() {
+                return summary.hasMore();
+            }
+
+            @Override
+            public Map<String, Value> metadata() {
+                return boltValueFactory.toDriverMap(summary.metadata());
+            }
+        });
     }
 
     @Override
     public void onDiscardSummary(DiscardSummary summary) {
-        delegate.onDiscardSummary(summary);
+        delegate.onDiscardSummary(() -> boltValueFactory.toDriverMap(summary.metadata()));
     }
 
     @Override
