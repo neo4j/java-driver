@@ -39,6 +39,9 @@ import org.neo4j.driver.Config;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Logging;
 import org.neo4j.driver.MetricsAdapter;
+import org.neo4j.driver.internal.adaptedbolt.AdaptingDriverBoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.ErrorMapper;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DefaultDomainNameResolver;
@@ -158,7 +161,7 @@ public class DriverFactory {
             AuthTokenManager authTokenManager,
             boolean ownsEventLoopGroup,
             Supplier<Rediscovery> rediscoverySupplier) {
-        BoltConnectionProvider boltConnectionProvider = null;
+        DriverBoltConnectionProvider boltConnectionProvider = null;
         try {
             boltConnectionProvider =
                     createBoltConnectionProvider(uri, config, eventLoopGroup, routingSettings, rediscoverySupplier);
@@ -204,28 +207,33 @@ public class DriverFactory {
                         .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private BoltConnectionProvider createBoltConnectionProvider(
+    private DriverBoltConnectionProvider createBoltConnectionProvider(
             URI uri,
             Config config,
             EventLoopGroup eventLoopGroup,
             RoutingSettings routingSettings,
             Supplier<Rediscovery> rediscoverySupplier) {
-        BoltConnectionProvider boltConnectionProvider;
+        DriverBoltConnectionProvider boltConnectionProvider;
         var clock = createClock();
         var loggingProvider = new BoltLoggingProvider(config.logging());
         Supplier<BoltConnectionProvider> pooledBoltConnectionProviderSupplier =
                 () -> createPooledBoltConnectionProvider(config, eventLoopGroup, clock, loggingProvider);
+        var errorMapper = ErrorMapper.getInstance();
         if (uri.getScheme().startsWith("bolt")) {
             assertNoRoutingContext(uri, routingSettings);
-            boltConnectionProvider = pooledBoltConnectionProviderSupplier.get();
+            boltConnectionProvider = new AdaptingDriverBoltConnectionProvider(
+                    pooledBoltConnectionProviderSupplier.get(), errorMapper, false);
         } else {
-            boltConnectionProvider = createRoutedBoltConnectionProvider(
-                    config,
-                    pooledBoltConnectionProviderSupplier,
-                    routingSettings,
-                    rediscoverySupplier,
-                    clock,
-                    loggingProvider);
+            boltConnectionProvider = new AdaptingDriverBoltConnectionProvider(
+                    createRoutedBoltConnectionProvider(
+                            config,
+                            pooledBoltConnectionProviderSupplier,
+                            routingSettings,
+                            rediscoverySupplier,
+                            clock,
+                            loggingProvider),
+                    errorMapper,
+                    true);
         }
         return boltConnectionProvider;
     }
@@ -308,7 +316,7 @@ public class DriverFactory {
      */
     protected SessionFactory createSessionFactory(
             BoltSecurityPlanManager securityPlanManager,
-            BoltConnectionProvider connectionProvider,
+            DriverBoltConnectionProvider connectionProvider,
             RetryLogic retryLogic,
             Config config,
             AuthTokenManager authTokenManager) {

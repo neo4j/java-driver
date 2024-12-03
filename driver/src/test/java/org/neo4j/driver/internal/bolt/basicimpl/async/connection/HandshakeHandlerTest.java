@@ -43,12 +43,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.ChunkDecoder;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.InboundMessageDispatcher;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.InboundMessageHandler;
@@ -86,7 +85,7 @@ class HandshakeHandlerTest {
         channel.pipeline().fireExceptionCaught(cause);
 
         // promise should fail
-        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
+        var error = assertThrows(BoltServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(cause, error.getCause());
 
         // channel should be closed
@@ -99,11 +98,11 @@ class HandshakeHandlerTest {
         var handler = newHandler(handshakeCompletedFuture);
         channel.pipeline().addLast(handler);
 
-        var error = new ServiceUnavailableException("Bad error");
+        var error = new BoltServiceUnavailableException("Bad error");
         channel.pipeline().fireExceptionCaught(error);
 
         // promise should fail
-        var e = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
+        var e = assertThrows(BoltServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(error, e);
 
         // channel should be closed
@@ -122,7 +121,7 @@ class HandshakeHandlerTest {
         channel.pipeline().fireExceptionCaught(error2);
 
         // promise should fail
-        var e1 = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
+        var e1 = assertThrows(BoltServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(error1, e1.getCause());
 
         // channel should be closed
@@ -142,7 +141,7 @@ class HandshakeHandlerTest {
         channel.pipeline().fireExceptionCaught(new DecoderException(cause));
 
         // promise should fail
-        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
+        var error = assertThrows(BoltServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(cause, error.getCause());
 
         // channel should be closed
@@ -158,7 +157,7 @@ class HandshakeHandlerTest {
         var decoderException = new DecoderException("Unable to decode a message");
         channel.pipeline().fireExceptionCaught(decoderException);
 
-        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
+        var error = assertThrows(BoltServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(decoderException, error.getCause());
 
         // channel should be closed
@@ -166,7 +165,7 @@ class HandshakeHandlerTest {
     }
 
     @Test
-    void shouldTranslateSSLHandshakeException() {
+    void shouldNotTranslateSSLHandshakeException() {
         var handshakeCompletedFuture = new CompletableFuture<Channel>();
         var handler = newHandler(handshakeCompletedFuture);
         channel.pipeline().addLast(handler);
@@ -175,8 +174,8 @@ class HandshakeHandlerTest {
         channel.pipeline().fireExceptionCaught(error);
 
         // promise should fail
-        var e = assertThrows(SecurityException.class, () -> await(handshakeCompletedFuture));
-        assertEquals(error, e.getCause());
+        var e = assertThrows(SSLHandshakeException.class, () -> await(handshakeCompletedFuture));
+        assertEquals(error, e);
 
         // channel should be closed
         assertNull(await(channel.closeFuture()));
@@ -235,7 +234,7 @@ class HandshakeHandlerTest {
         channel.pipeline().fireChannelInactive();
 
         // promise should fail
-        var error = assertThrows(ServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
+        var error = assertThrows(BoltServiceUnavailableException.class, () -> await(handshakeCompletedFuture));
         assertEquals(ErrorUtil.newConnectionTerminatedError().getMessage(), error.getMessage());
 
         // channel should be closed
@@ -254,7 +253,7 @@ class HandshakeHandlerTest {
 
         // promise should fail
         var error = assertThrows(Exception.class, () -> await(handshakeCompletedFuture));
-        assertThat(error, instanceOf(ClientException.class));
+        assertThat(error, instanceOf(BoltClientException.class));
         assertThat(error.getMessage(), startsWith(expectedMessagePrefix));
 
         // channel should be closed

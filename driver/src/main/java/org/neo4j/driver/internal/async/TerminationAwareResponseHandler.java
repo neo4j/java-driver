@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import org.neo4j.driver.Logger;
 import org.neo4j.driver.Logging;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.util.Futures;
 
 final class TerminationAwareResponseHandler extends DelegatingResponseHandler {
@@ -31,7 +31,7 @@ final class TerminationAwareResponseHandler extends DelegatingResponseHandler {
 
     TerminationAwareResponseHandler(
             Logging logging,
-            ResponseHandler delegate,
+            DriverResponseHandler delegate,
             TerminationAwareStateLockingExecutor executor,
             Consumer<Throwable> throwableConsumer) {
         super(delegate);

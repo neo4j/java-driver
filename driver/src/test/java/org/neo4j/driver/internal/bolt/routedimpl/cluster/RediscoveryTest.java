@@ -61,13 +61,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
-import org.neo4j.driver.exceptions.AuthTokenManagerExecutionException;
-import org.neo4j.driver.exceptions.AuthenticationException;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.SessionExpiredException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -76,9 +69,14 @@ import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.ClusterComposition;
 import org.neo4j.driver.internal.bolt.api.DefaultDomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
+import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
+import org.neo4j.driver.internal.bolt.routedimpl.AuthTokenManagerExecutionException;
 import org.neo4j.driver.internal.util.FakeClock;
 import org.neo4j.driver.internal.util.ImmediateSchedulingEventExecutor;
 
@@ -117,7 +115,7 @@ class RediscoveryTest {
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!")); // first -> non-fatal failure
-        responsesByAddress.put(B, new ServiceUnavailableException("Hi!")); // second -> non-fatal failure
+        responsesByAddress.put(B, new BoltServiceUnavailableException("Hi!")); // second -> non-fatal failure
         responsesByAddress.put(C, expectedComposition); // third -> valid cluster composition
 
         var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
@@ -143,7 +141,13 @@ class RediscoveryTest {
 
     @Test
     void shouldFailImmediatelyOnAuthError() {
-        var authError = new AuthenticationException("Neo.ClientError.Security.Unauthorized", "Wrong password");
+        var authError = new BoltFailureException(
+                "Neo.ClientError.Security.Unauthorized",
+                "Wrong password",
+                GqlStatusError.UNKNOWN.getStatus(),
+                GqlStatusError.UNKNOWN.getStatusDescription(""),
+                GqlStatusError.DIAGNOSTIC_RECORD,
+                null);
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure
@@ -154,7 +158,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var error = assertThrows(
-                AuthenticationException.class,
+                BoltFailureException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,
@@ -174,7 +178,14 @@ class RediscoveryTest {
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(
-                A, new AuthorizationExpiredException("Neo.ClientError.Security.AuthorizationExpired", "message"));
+                A,
+                new BoltFailureException(
+                        "Neo.ClientError.Security.AuthorizationExpired",
+                        "message",
+                        GqlStatusError.UNKNOWN.getStatus(),
+                        GqlStatusError.UNKNOWN.getStatusDescription(""),
+                        GqlStatusError.DIAGNOSTIC_RECORD,
+                        null));
         responsesByAddress.put(B, expectedComposition);
 
         var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
@@ -204,7 +215,13 @@ class RediscoveryTest {
                 "Neo.ClientError.Transaction.InvalidBookmarkMixture"
             })
     void shouldFailImmediatelyOnBookmarkErrors(String code) {
-        var error = new ClientException(code, "Invalid");
+        var error = new BoltFailureException(
+                code,
+                "Invalid",
+                GqlStatusError.UNKNOWN.getStatus(),
+                GqlStatusError.UNKNOWN.getStatusDescription(""),
+                GqlStatusError.DIAGNOSTIC_RECORD,
+                null);
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!"));
@@ -215,7 +232,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var actualError = assertThrows(
-                ClientException.class,
+                BoltFailureException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,
@@ -261,8 +278,8 @@ class RediscoveryTest {
                 new ClusterComposition(42, asOrderedSet(C, B, A), asOrderedSet(A, B), asOrderedSet(D, E), null);
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
-        responsesByAddress.put(B, new ServiceUnavailableException("Hi!")); // first -> non-fatal failure
-        responsesByAddress.put(C, new ServiceUnavailableException("Hi!")); // second -> non-fatal failure
+        responsesByAddress.put(B, new BoltServiceUnavailableException("Hi!")); // first -> non-fatal failure
+        responsesByAddress.put(C, new BoltServiceUnavailableException("Hi!")); // second -> non-fatal failure
         responsesByAddress.put(initialRouter, expectedComposition); // initial -> valid response
 
         var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
@@ -292,8 +309,8 @@ class RediscoveryTest {
                 new ClusterComposition(42, asOrderedSet(A, B), asOrderedSet(A, B), asOrderedSet(A, B), null);
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
-        responsesByAddress.put(B, new ServiceUnavailableException("Hi!")); // first -> non-fatal failure
-        responsesByAddress.put(C, new ServiceUnavailableException("Hi!")); // second -> non-fatal failure
+        responsesByAddress.put(B, new BoltServiceUnavailableException("Hi!")); // first -> non-fatal failure
+        responsesByAddress.put(C, new BoltServiceUnavailableException("Hi!")); // second -> non-fatal failure
         responsesByAddress.put(D, new IOException("Hi!")); // resolved first -> non-fatal failure
         responsesByAddress.put(E, expectedComposition); // resolved second -> valid response
 
@@ -330,8 +347,8 @@ class RediscoveryTest {
         };
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
-        responsesByAddress.put(B, new ServiceUnavailableException("Hi!")); // first -> non-fatal failure
-        responsesByAddress.put(C, new ServiceUnavailableException("Hi!")); // second -> non-fatal failure
+        responsesByAddress.put(B, new BoltServiceUnavailableException("Hi!")); // first -> non-fatal failure
+        responsesByAddress.put(C, new BoltServiceUnavailableException("Hi!")); // second -> non-fatal failure
         responsesByAddress.put(E, expectedComposition); // resolved second -> valid response
 
         var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
@@ -388,9 +405,9 @@ class RediscoveryTest {
     @Test
     void shouldRecordAllErrorsWhenNoRouterRespond() {
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
-        var first = new ServiceUnavailableException("Hi!");
+        var first = new BoltServiceUnavailableException("Hi!");
         responsesByAddress.put(A, first); // first -> non-fatal failure
-        var second = new SessionExpiredException("Hi!");
+        var second = new BoltServiceUnavailableException("Hi!");
         responsesByAddress.put(B, second); // second -> non-fatal failure
         var third = new IOException("Hi!");
         responsesByAddress.put(C, third); // third -> non-fatal failure
@@ -400,7 +417,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var e = assertThrows(
-                ServiceUnavailableException.class,
+                BoltServiceUnavailableException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,
@@ -476,7 +493,7 @@ class RediscoveryTest {
                 new ClusterComposition(42, asOrderedSet(D, E), asOrderedSet(E, D), asOrderedSet(A, B), null);
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
-        responsesByAddress.put(initialRouter, new ServiceUnavailableException("Hi")); // initial -> non-fatal error
+        responsesByAddress.put(initialRouter, new BoltServiceUnavailableException("Hi")); // initial -> non-fatal error
         responsesByAddress.put(D, new IOException("Hi")); // first known -> non-fatal failure
         responsesByAddress.put(E, validComposition); // second known -> valid composition
 
@@ -501,7 +518,7 @@ class RediscoveryTest {
 
     @Test
     void shouldNotLogWhenSingleRetryAttemptFails() {
-        Map<BoltServerAddress, Object> responsesByAddress = singletonMap(A, new ServiceUnavailableException("Hi!"));
+        Map<BoltServerAddress, Object> responsesByAddress = singletonMap(A, new BoltServiceUnavailableException("Hi!"));
         var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
         var resolver = resolverMock(A, A);
 
@@ -513,7 +530,7 @@ class RediscoveryTest {
         var table = routingTableMock(A);
 
         var e = assertThrows(
-                ServiceUnavailableException.class,
+                BoltServiceUnavailableException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,
@@ -549,7 +566,7 @@ class RediscoveryTest {
 
     @Test
     void shouldFailImmediatelyOnAuthTokenManagerExecutionException() {
-        var exception = new AuthTokenManagerExecutionException("message", mock(Throwable.class));
+        var exception = new AuthTokenManagerExecutionException(mock(Throwable.class));
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure
@@ -575,7 +592,7 @@ class RediscoveryTest {
 
     @Test
     void shouldFailImmediatelyOnUnsupportedFeatureException() {
-        var exception = new UnsupportedFeatureException("message", mock(Throwable.class));
+        var exception = new BoltUnsupportedFeatureException("message");
 
         Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
         responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure
@@ -586,7 +603,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var actualException = assertThrows(
-                UnsupportedFeatureException.class,
+                BoltUnsupportedFeatureException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,
@@ -612,7 +629,7 @@ class RediscoveryTest {
         var table = routingTableMock(true);
         var pool = mock(BoltConnectionProvider.class);
         given(pool.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .willReturn(failedFuture(new ServiceUnavailableException("not available")));
+                .willReturn(failedFuture(new BoltServiceUnavailableException("not available")));
         var logging = mock(LoggingProvider.class);
         var logger = mock(System.Logger.class);
         given(logging.getLog(any(Class.class))).willReturn(logger);
@@ -623,7 +640,7 @@ class RediscoveryTest {
 
         // WHEN & THEN
         assertThrows(
-                ServiceUnavailableException.class,
+                BoltServiceUnavailableException.class,
                 () -> await(rediscovery.lookupClusterComposition(
                         SecurityPlan.INSECURE,
                         table,

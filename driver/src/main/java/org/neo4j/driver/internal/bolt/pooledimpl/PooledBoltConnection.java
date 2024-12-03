@@ -23,7 +23,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.AuthData;
 import org.neo4j.driver.internal.bolt.api.BasicResponseHandler;
@@ -36,6 +35,7 @@ import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.TransactionType;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
@@ -181,8 +181,10 @@ public class PooledBoltConnection implements BoltConnection {
 
                     @Override
                     public void onError(Throwable throwable) {
-                        if (throwable instanceof AuthorizationExpiredException) {
-                            provider.onExpired();
+                        if (throwable instanceof BoltFailureException boltFailureException) {
+                            if ("Neo.ClientError.Security.AuthorizationExpired".equals(boltFailureException.code())) {
+                                provider.onExpired();
+                            }
                         }
                         handler.onError(throwable);
                     }

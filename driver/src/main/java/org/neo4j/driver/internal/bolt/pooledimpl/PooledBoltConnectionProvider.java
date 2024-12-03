@@ -36,7 +36,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.TransientException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BasicResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
@@ -46,12 +45,12 @@ import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.exception.BoltTransientException;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.pooledimpl.util.FutureUtil;
 
@@ -245,14 +244,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                     acquisitionTimeout,
                                     TimeUnit.MILLISECONDS);
                         } else {
-                            var message = "Connection pool pending acquisition queue is full.";
-                            pendingAcquisitionsFull = new TransientException(
-                                    GqlStatusError.UNKNOWN.getStatus(),
-                                    GqlStatusError.UNKNOWN.getStatusDescription(message),
-                                    "N/A",
-                                    message,
-                                    GqlStatusError.DIAGNOSTIC_RECORD,
-                                    null);
+                            pendingAcquisitionsFull =
+                                    new BoltTransientException("Connection pool pending acquisition queue is full.");
                         }
                     }
                 }

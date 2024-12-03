@@ -23,8 +23,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import org.neo4j.driver.Logger;
 import org.neo4j.driver.Logging;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.util.Futures;
 
 final class TerminationAwareBoltConnection extends DelegatingBoltConnection {
@@ -35,7 +35,7 @@ final class TerminationAwareBoltConnection extends DelegatingBoltConnection {
 
     public TerminationAwareBoltConnection(
             Logging logging,
-            BoltConnection delegate,
+            DriverBoltConnection delegate,
             TerminationAwareStateLockingExecutor executor,
             Consumer<Throwable> throwableConsumer) {
         super(delegate);
@@ -45,15 +45,15 @@ final class TerminationAwareBoltConnection extends DelegatingBoltConnection {
         this.throwableConsumer = Objects.requireNonNull(throwableConsumer);
     }
 
-    public CompletionStage<BoltConnection> clearAndReset() {
-        var future = new CompletableFuture<BoltConnection>();
+    public CompletionStage<DriverBoltConnection> clearAndReset() {
+        var future = new CompletableFuture<DriverBoltConnection>();
         var thisVal = this;
 
         delegate.onLoop()
                 .thenCompose(connection -> executor.execute(ignored -> connection
                         .clear()
-                        .thenCompose(BoltConnection::reset)
-                        .thenCompose(conn -> conn.flush(new ResponseHandler() {
+                        .thenCompose(DriverBoltConnection::reset)
+                        .thenCompose(conn -> conn.flush(new DriverResponseHandler() {
                             Throwable throwable = null;
 
                             @Override
@@ -83,7 +83,7 @@ final class TerminationAwareBoltConnection extends DelegatingBoltConnection {
     }
 
     @Override
-    public CompletionStage<Void> flush(ResponseHandler handler) {
+    public CompletionStage<Void> flush(DriverResponseHandler handler) {
         return delegate.onLoop()
                 .thenCompose(connection -> executor.execute(causeOfTermination -> {
                     if (causeOfTermination == null) {

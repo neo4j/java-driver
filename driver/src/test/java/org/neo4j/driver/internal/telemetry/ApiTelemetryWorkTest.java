@@ -25,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 
 class ApiTelemetryWorkTest {
@@ -35,7 +35,7 @@ class ApiTelemetryWorkTest {
     void shouldPipelineTelemetryWhenTelemetryIsEnabledAndConnectionSupportsTelemetry(TelemetryApi telemetryApi) {
         var apiTelemetryWork = new ApiTelemetryWork(telemetryApi);
         apiTelemetryWork.setEnabled(true);
-        var boltConnection = Mockito.mock(BoltConnection.class);
+        var boltConnection = Mockito.mock(DriverBoltConnection.class);
         var boltConnectionStage = CompletableFuture.completedFuture(boltConnection);
         given(boltConnection.telemetrySupported()).willReturn(true);
         given(boltConnection.telemetry(telemetryApi)).willReturn(boltConnectionStage);
@@ -52,7 +52,7 @@ class ApiTelemetryWorkTest {
             TelemetryApi telemetryApi) {
         var apiTelemetryWork = new ApiTelemetryWork(telemetryApi);
         apiTelemetryWork.setEnabled(true);
-        var boltConnection = Mockito.mock(BoltConnection.class);
+        var boltConnection = Mockito.mock(DriverBoltConnection.class);
 
         var future = apiTelemetryWork.pipelineTelemetryIfEnabled(boltConnection).toCompletableFuture();
 
@@ -67,7 +67,7 @@ class ApiTelemetryWorkTest {
     void shouldNotPipelineTelemetryWhenTelemetryIsDisabledAndConnectionDoesNotSupportTelemetry(
             TelemetryApi telemetryApi) {
         var apiTelemetryWork = new ApiTelemetryWork(telemetryApi);
-        var boltConnection = Mockito.mock(BoltConnection.class);
+        var boltConnection = Mockito.mock(DriverBoltConnection.class);
 
         var future = apiTelemetryWork.pipelineTelemetryIfEnabled(boltConnection).toCompletableFuture();
 
@@ -80,7 +80,7 @@ class ApiTelemetryWorkTest {
     @EnumSource(TelemetryApi.class)
     void shouldNotPipelineTelemetryWhenTelemetryIsDisabledAndConnectionSupportsTelemetry(TelemetryApi telemetryApi) {
         var apiTelemetryWork = new ApiTelemetryWork(telemetryApi);
-        var boltConnection = Mockito.mock(BoltConnection.class);
+        var boltConnection = Mockito.mock(DriverBoltConnection.class);
         given(boltConnection.telemetrySupported()).willReturn(true);
 
         var future = apiTelemetryWork.pipelineTelemetryIfEnabled(boltConnection).toCompletableFuture();

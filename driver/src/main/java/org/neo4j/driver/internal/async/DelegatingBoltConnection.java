@@ -22,38 +22,38 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.AuthData;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.TransactionType;
 
-public abstract class DelegatingBoltConnection implements BoltConnection {
-    protected final BoltConnection delegate;
+public abstract class DelegatingBoltConnection implements DriverBoltConnection {
+    protected final DriverBoltConnection delegate;
 
-    protected DelegatingBoltConnection(BoltConnection delegate) {
+    protected DelegatingBoltConnection(DriverBoltConnection delegate) {
         this.delegate = Objects.requireNonNull(delegate);
     }
 
     @Override
-    public CompletionStage<BoltConnection> onLoop() {
+    public CompletionStage<DriverBoltConnection> onLoop() {
         return delegate.onLoop().thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> route(
+    public CompletionStage<DriverBoltConnection> route(
             DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks) {
         return delegate.route(databaseName, impersonatedUser, bookmarks).thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> beginTransaction(
+    public CompletionStage<DriverBoltConnection> beginTransaction(
             DatabaseName databaseName,
             AccessMode accessMode,
             String impersonatedUser,
@@ -77,7 +77,7 @@ public abstract class DelegatingBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<BoltConnection> runInAutoCommitTransaction(
+    public CompletionStage<DriverBoltConnection> runInAutoCommitTransaction(
             DatabaseName databaseName,
             AccessMode accessMode,
             String impersonatedUser,
@@ -101,57 +101,57 @@ public abstract class DelegatingBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<BoltConnection> run(String query, Map<String, Value> parameters) {
+    public CompletionStage<DriverBoltConnection> run(String query, Map<String, Value> parameters) {
         return delegate.run(query, parameters).thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> pull(long qid, long request) {
+    public CompletionStage<DriverBoltConnection> pull(long qid, long request) {
         return delegate.pull(qid, request).thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> discard(long qid, long number) {
+    public CompletionStage<DriverBoltConnection> discard(long qid, long number) {
         return delegate.discard(qid, number).thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> commit() {
+    public CompletionStage<DriverBoltConnection> commit() {
         return delegate.commit().thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> rollback() {
+    public CompletionStage<DriverBoltConnection> rollback() {
         return delegate.rollback().thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> reset() {
+    public CompletionStage<DriverBoltConnection> reset() {
         return delegate.reset().thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> logoff() {
+    public CompletionStage<DriverBoltConnection> logoff() {
         return delegate.logoff().thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> logon(Map<String, Value> authMap) {
+    public CompletionStage<DriverBoltConnection> logon(Map<String, Value> authMap) {
         return delegate.logon(authMap).thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> telemetry(TelemetryApi telemetryApi) {
+    public CompletionStage<DriverBoltConnection> telemetry(TelemetryApi telemetryApi) {
         return delegate.telemetry(telemetryApi).thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<BoltConnection> clear() {
+    public CompletionStage<DriverBoltConnection> clear() {
         return delegate.clear().thenApply(ignored -> this);
     }
 
     @Override
-    public CompletionStage<Void> flush(ResponseHandler handler) {
+    public CompletionStage<Void> flush(DriverResponseHandler handler) {
         return delegate.flush(handler);
     }
 

@@ -24,10 +24,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.SessionExpiredException;
-import org.neo4j.driver.exceptions.TransientException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.AuthData;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
@@ -35,11 +31,12 @@ import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.TransactionType;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
@@ -307,62 +304,44 @@ public class RoutedBoltConnection implements BoltConnection {
     private Throwable handledError(Throwable receivedError, boolean notifyHandler) {
         var error = FutureUtil.completionExceptionCause(receivedError);
 
-        if (error instanceof ServiceUnavailableException exception) {
-            return handledServiceUnavailableException(exception, notifyHandler);
-        } else if (error instanceof ClientException exception) {
-            return handledClientException(exception, notifyHandler);
-        } else if (error instanceof TransientException exception) {
-            return handledTransientException(exception, notifyHandler);
+        if (error instanceof BoltServiceUnavailableException boltServiceUnavailableException) {
+            return handledServiceUnavailableException(boltServiceUnavailableException, notifyHandler);
+        } else if (error instanceof BoltFailureException boltFailureException) {
+            return handledBoltFailureException(boltFailureException, notifyHandler);
         } else {
             return error;
         }
     }
 
-    private Throwable handledServiceUnavailableException(ServiceUnavailableException e, boolean notifyHandler) {
+    private Throwable handledServiceUnavailableException(BoltServiceUnavailableException e, boolean notifyHandler) {
         if (notifyHandler) {
             routingTableHandler.onConnectionFailure(serverAddress());
         }
-        return new SessionExpiredException(format("Server at %s is no longer available", serverAddress()), e);
+        return new BoltServiceUnavailableException(format("Server at %s is no longer available", serverAddress()), e);
     }
 
-    private Throwable handledTransientException(TransientException e, boolean notifyHandler) {
+    private Throwable handledBoltFailureException(BoltFailureException e, boolean notifyHandler) {
         var errorCode = e.code();
-        if (Objects.equals(errorCode, "Neo.TransientError.General.DatabaseUnavailable") && notifyHandler) {
-            routingTableHandler.onConnectionFailure(serverAddress());
-        }
-        return e;
-    }
-
-    private Throwable handledClientException(ClientException e, boolean notifyHandler) {
-        if (isFailureToWrite(e)) {
+        if (Objects.equals(errorCode, "Neo.TransientError.General.DatabaseUnavailable")) {
+            if (notifyHandler) {
+                routingTableHandler.onConnectionFailure(serverAddress());
+            }
+        } else if (isFailureToWrite(errorCode)) {
             // The server is unaware of the session mode, so we have to implement this logic in the driver.
             // In the future, we might be able to move this logic to the server.
             switch (accessMode) {
-                case READ -> {
-                    var message = "Write queries cannot be performed in READ access mode.";
-                    return new ClientException(
-                            GqlStatusError.UNKNOWN.getStatus(),
-                            GqlStatusError.UNKNOWN.getStatusDescription(message),
-                            "N/A",
-                            message,
-                            GqlStatusError.DIAGNOSTIC_RECORD,
-                            null);
-                }
+                case READ -> {}
                 case WRITE -> {
                     if (notifyHandler) {
                         routingTableHandler.onWriteFailure(serverAddress());
                     }
-                    return new SessionExpiredException(
-                            format("Server at %s no longer accepts writes", serverAddress()));
                 }
-                default -> throw new IllegalArgumentException(serverAddress() + " not supported.");
             }
         }
         return e;
     }
 
-    private static boolean isFailureToWrite(ClientException e) {
-        var errorCode = e.code();
+    private static boolean isFailureToWrite(String errorCode) {
         return Objects.equals(errorCode, "Neo.ClientError.Cluster.NotALeader")
                 || Objects.equals(errorCode, "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase");
     }

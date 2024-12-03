@@ -77,11 +77,11 @@ import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.exceptions.SessionExpiredException;
 import org.neo4j.driver.internal.InternalBookmark;
 import org.neo4j.driver.internal.InternalRecord;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RollbackSummary;
 import org.neo4j.driver.internal.retry.RetryLogic;
@@ -89,8 +89,8 @@ import org.neo4j.driver.internal.util.FixedRetryLogic;
 import org.neo4j.driver.internal.value.IntegerValue;
 
 class InternalAsyncSessionTest {
-    private BoltConnection connection;
-    private BoltConnectionProvider connectionProvider;
+    private DriverBoltConnection connection;
+    private DriverBoltConnectionProvider connectionProvider;
     private AsyncSession asyncSession;
     private NetworkSession session;
 
@@ -99,9 +99,9 @@ class InternalAsyncSessionTest {
         connection = connectionMock(new BoltProtocolVersion(4, 0));
         given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.close()).willReturn(completedFuture(null));
-        connectionProvider = mock(BoltConnectionProvider.class);
+        connectionProvider = mock(DriverBoltConnectionProvider.class);
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .willAnswer((Answer<CompletionStage<BoltConnection>>) invocation -> {
+                .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var database = (DatabaseName) invocation.getArguments()[1];
                     @SuppressWarnings("unchecked")
                     var databaseConsumer = (Consumer<DatabaseName>) invocation.getArguments()[8];
@@ -323,7 +323,7 @@ class InternalAsyncSessionTest {
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));
         var failures = 12;
         var failureHandlerStream = IntStream.range(0, failures)
-                .mapToObj(ignored -> Stream.<Consumer<ResponseHandler>>of(
+                .mapToObj(ignored -> Stream.<Consumer<DriverResponseHandler>>of(
                         handler -> {
                             handler.onBeginSummary(mock(BeginSummary.class));
                             handler.onComplete();
@@ -334,7 +334,7 @@ class InternalAsyncSessionTest {
                         }))
                 .flatMap(Function.identity());
         var retries = failures + 1;
-        var successHandlers = Stream.<Consumer<ResponseHandler>>of(
+        var successHandlers = Stream.<Consumer<DriverResponseHandler>>of(
                 handler -> {
                     handler.onBeginSummary(mock(BeginSummary.class));
                     handler.onComplete();
@@ -365,7 +365,7 @@ class InternalAsyncSessionTest {
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));
         var failures = 13;
         var failureHandlerStream = IntStream.range(0, failures)
-                .mapToObj(ignored -> Stream.<Consumer<ResponseHandler>>of(
+                .mapToObj(ignored -> Stream.<Consumer<DriverResponseHandler>>of(
                         handler -> {
                             handler.onBeginSummary(mock(BeginSummary.class));
                             handler.onComplete();
@@ -376,7 +376,7 @@ class InternalAsyncSessionTest {
                         }))
                 .flatMap(Function.identity());
         var retries = failures + 1;
-        var successHandlers = Stream.<Consumer<ResponseHandler>>of(
+        var successHandlers = Stream.<Consumer<DriverResponseHandler>>of(
                 handler -> {
                     handler.onBeginSummary(mock(BeginSummary.class));
                     handler.onComplete();
@@ -406,7 +406,7 @@ class InternalAsyncSessionTest {
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
         var failures = 14;
         var failureHandlerStream = IntStream.range(0, failures)
-                .mapToObj(ignored -> Stream.<Consumer<ResponseHandler>>of(
+                .mapToObj(ignored -> Stream.<Consumer<DriverResponseHandler>>of(
                         handler -> {
                             handler.onBeginSummary(mock(BeginSummary.class));
                             handler.onComplete();
@@ -440,7 +440,7 @@ class InternalAsyncSessionTest {
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));
         var failures = 17;
         var failureHandlerStream = IntStream.range(0, failures)
-                .mapToObj(ignored -> Stream.<Consumer<ResponseHandler>>of(
+                .mapToObj(ignored -> Stream.<Consumer<DriverResponseHandler>>of(
                         handler -> {
                             handler.onBeginSummary(mock(BeginSummary.class));
                             handler.onComplete();

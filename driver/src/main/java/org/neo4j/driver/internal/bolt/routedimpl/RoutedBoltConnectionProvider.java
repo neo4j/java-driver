@@ -27,15 +27,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.SecurityException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.SessionExpiredException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
@@ -50,6 +49,9 @@ import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.exception.BoltConnectionAcquisitionException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.routedimpl.cluster.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.cluster.RediscoveryImpl;
 import org.neo4j.driver.internal.bolt.routedimpl.cluster.RoutingTable;
@@ -150,6 +152,11 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             registry = this.registry;
         }
 
+        Supplier<CompletionStage<Map<String, Value>>> supplier =
+                () -> authMapStageSupplier.get().exceptionally(throwable -> {
+                    throw new AuthTokenManagerExecutionException(throwable);
+                });
+
         var handlerRef = new AtomicReference<RoutingTableHandler>();
         var databaseNameFuture = databaseName == null
                 ? new CompletableFuture<DatabaseName>()
@@ -160,13 +167,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             }
         });
         return registry.ensureRoutingTable(
-                        securityPlan,
-                        databaseNameFuture,
-                        mode,
-                        bookmarks,
-                        impersonatedUser,
-                        authMapStageSupplier,
-                        minVersion)
+                        securityPlan, databaseNameFuture, mode, bookmarks, impersonatedUser, supplier, minVersion)
                 .thenApply(routingTableHandler -> {
                     handlerRef.set(routingTableHandler);
                     return routingTableHandler;
@@ -175,13 +176,25 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                         securityPlan,
                         mode,
                         routingTableHandler.routingTable(),
-                        authMapStageSupplier,
+                        supplier,
                         routingTableHandler.routingTable().database(),
                         Set.of(),
                         impersonatedUser,
                         minVersion,
                         notificationConfig))
-                .thenApply(boltConnection -> new RoutedBoltConnection(boltConnection, handlerRef.get(), mode, this));
+                .thenApply(boltConnection ->
+                        (BoltConnection) new RoutedBoltConnection(boltConnection, handlerRef.get(), mode, this))
+                .exceptionally(throwable -> {
+                    throwable = FutureUtil.completionExceptionCause(throwable);
+                    if (throwable instanceof AuthTokenManagerExecutionException) {
+                        throwable = throwable.getCause();
+                    }
+                    if (throwable instanceof RuntimeException runtimeException) {
+                        throw runtimeException;
+                    } else {
+                        throw new CompletionException(throwable);
+                    }
+                });
     }
 
     @Override
@@ -204,8 +217,8 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                 .handle((ignored, error) -> {
                     if (error != null) {
                         var cause = FutureUtil.completionExceptionCause(error);
-                        if (cause instanceof ServiceUnavailableException) {
-                            throw FutureUtil.asCompletionException(new ServiceUnavailableException(
+                        if (cause instanceof BoltServiceUnavailableException) {
+                            throw FutureUtil.asCompletionException(new BoltServiceUnavailableException(
                                     "Unable to connect to database management service, ensure the database is running and that there is a working network connection to it.",
                                     cause));
                         }
@@ -262,13 +275,20 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             return CompletableFuture.failedFuture(error);
         }
         CompletableFuture<Boolean> result = CompletableFuture.completedFuture(null);
-        Throwable baseError = new ServiceUnavailableException(baseErrorMessagePrefix + addresses);
+        Throwable baseError = new BoltServiceUnavailableException(baseErrorMessagePrefix + addresses);
+
+        Function<BoltFailureException, Boolean> isSecurityException =
+                boltFailureException -> boltFailureException.code().startsWith("Neo.ClientError.Security.");
 
         for (var address : addresses) {
             result = FutureUtil.onErrorContinue(result, baseError, completionError -> {
                 // We fail fast on security errors
                 var error = FutureUtil.completionExceptionCause(completionError);
-                if (error instanceof SecurityException) {
+                if (error instanceof BoltFailureException boltFailureException) {
+                    if (isSecurityException.apply(boltFailureException)) {
+                        return CompletableFuture.failedFuture(error);
+                    }
+                } else if (error instanceof SSLHandshakeException) {
                     return CompletableFuture.failedFuture(error);
                 }
                 return get(address)
@@ -292,7 +312,11 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             // If we failed with security errors, then we rethrow the security error out, otherwise we throw the chained
             // errors.
             var error = FutureUtil.completionExceptionCause(completionError);
-            if (error instanceof SecurityException) {
+            if (error instanceof BoltFailureException boltFailureException) {
+                if (isSecurityException.apply(boltFailureException)) {
+                    return CompletableFuture.failedFuture(error);
+                }
+            } else if (error instanceof SSLHandshakeException) {
                 return CompletableFuture.failedFuture(error);
             }
             return CompletableFuture.failedFuture(baseError);
@@ -344,7 +368,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
         log.log(System.Logger.Level.DEBUG, "Selected address: " + address);
 
         if (address == null) {
-            var completionError = new SessionExpiredException(
+            var completionError = new BoltConnectionAcquisitionException(
                     format(CONNECTION_ACQUISITION_COMPLETION_EXCEPTION_MESSAGE, mode, routingTable));
             attemptErrors.forEach(completionError::addSuppressed);
             log.log(System.Logger.Level.ERROR, CONNECTION_ACQUISITION_COMPLETION_FAILURE_MESSAGE, completionError);
@@ -366,7 +390,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                 .whenComplete((connection, completionError) -> {
                     var error = FutureUtil.completionExceptionCause(completionError);
                     if (error != null) {
-                        if (error instanceof ServiceUnavailableException) {
+                        if (error instanceof BoltServiceUnavailableException) {
                             var attemptMessage = format(CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE, address);
                             log.log(System.Logger.Level.WARNING, attemptMessage);
                             log.log(System.Logger.Level.DEBUG, attemptMessage, error);

@@ -46,10 +46,10 @@ import org.mockito.stubbing.Answer;
 import org.neo4j.driver.Logging;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.internal.InternalRecord;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.cursor.RxResultCursor;
 import org.neo4j.driver.internal.cursor.RxResultCursorImpl;
@@ -136,12 +136,12 @@ class InternalRxResultTest {
     @Test
     void shouldObtainRecordsAndSummary() {
         // Given
-        var boltConnection = mock(BoltConnection.class);
+        var boltConnection = mock(DriverBoltConnection.class);
         given(boltConnection.pull(anyLong(), anyLong())).willReturn(CompletableFuture.completedFuture(boltConnection));
         given(boltConnection.serverAddress()).willReturn(new BoltServerAddress("localhost"));
         given(boltConnection.protocolVersion()).willReturn(new BoltProtocolVersion(5, 1));
         given(boltConnection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArguments()[0];
+            var handler = (DriverResponseHandler) invocation.getArguments()[0];
             handler.onRecord(values(1, 1, 1));
             handler.onRecord(values(2, 2, 2));
             handler.onRecord(values(3, 3, 3));
@@ -169,12 +169,12 @@ class InternalRxResultTest {
     @Test
     void shouldCancelStreamingButObtainSummary() {
         // Given
-        var boltConnection = mock(BoltConnection.class);
+        var boltConnection = mock(DriverBoltConnection.class);
         given(boltConnection.pull(anyLong(), anyLong())).willReturn(CompletableFuture.completedFuture(boltConnection));
         given(boltConnection.serverAddress()).willReturn(new BoltServerAddress("localhost"));
         given(boltConnection.protocolVersion()).willReturn(new BoltProtocolVersion(5, 1));
         given(boltConnection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArguments()[0];
+            var handler = (DriverResponseHandler) invocation.getArguments()[0];
             handler.onRecord(values(1, 1, 1));
             handler.onRecord(values(2, 2, 2));
             handler.onRecord(values(3, 3, 3));
@@ -213,13 +213,13 @@ class InternalRxResultTest {
     @Test
     void shouldErrorIfFailedToStream() {
         // Given
-        var boltConnection = mock(BoltConnection.class);
+        var boltConnection = mock(DriverBoltConnection.class);
         given(boltConnection.pull(anyLong(), anyLong())).willReturn(CompletableFuture.completedFuture(boltConnection));
         given(boltConnection.serverAddress()).willReturn(new BoltServerAddress("localhost"));
         given(boltConnection.protocolVersion()).willReturn(new BoltProtocolVersion(5, 1));
         Throwable error = new RuntimeException("Hi");
         given(boltConnection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArguments()[0];
+            var handler = (DriverResponseHandler) invocation.getArguments()[0];
             handler.onError(error);
             handler.onComplete();
             return CompletableFuture.completedFuture(null);
@@ -251,11 +251,11 @@ class InternalRxResultTest {
         then(cursor).should().isDone();
     }
 
-    private InternalRxResult newRxResult(BoltConnection boltConnection) {
+    private InternalRxResult newRxResult(DriverBoltConnection boltConnection) {
         return newRxResult(boltConnection, mock());
     }
 
-    private InternalRxResult newRxResult(BoltConnection boltConnection, RunSummary runSummary) {
+    private InternalRxResult newRxResult(DriverBoltConnection boltConnection, RunSummary runSummary) {
         RxResultCursor cursor = new RxResultCursorImpl(
                 boltConnection, mock(), runSummary, null, databaseBookmark -> {}, false, Logging.none());
         return newRxResult(cursor);

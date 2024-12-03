@@ -27,7 +27,7 @@ import static org.neo4j.driver.internal.bolt.basicimpl.util.MetadataExtractor.ex
 
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.UntrustedServerException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUntrustedServerException;
 
 class MetadataExtractorTest {
     private static final String RESULT_AVAILABLE_AFTER_KEY = "available_after";
@@ -73,13 +73,14 @@ class MetadataExtractorTest {
 
     @Test
     void shouldFailToExtractServerVersionWhenMetadataDoesNotContainIt() {
-        assertThrows(UntrustedServerException.class, () -> extractServer(singletonMap("server", Values.NULL)));
-        assertThrows(UntrustedServerException.class, () -> extractServer(singletonMap("server", null)));
+        assertThrows(BoltUntrustedServerException.class, () -> extractServer(singletonMap("server", Values.NULL)));
+        assertThrows(BoltUntrustedServerException.class, () -> extractServer(singletonMap("server", null)));
     }
 
     @Test
     void shouldFailToExtractServerVersionFromNonNeo4jProduct() {
         assertThrows(
-                UntrustedServerException.class, () -> extractServer(singletonMap("server", value("NotNeo4j/1.2.3"))));
+                BoltUntrustedServerException.class,
+                () -> extractServer(singletonMap("server", value("NotNeo4j/1.2.3"))));
     }
 }

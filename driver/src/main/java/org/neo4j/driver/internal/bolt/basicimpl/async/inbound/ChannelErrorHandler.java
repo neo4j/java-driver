@@ -22,13 +22,12 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.CodecException;
 import java.io.IOException;
-import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltConnectionReadTimeoutException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelAttributes;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelActivityLogger;
 import org.neo4j.driver.internal.bolt.basicimpl.logging.ChannelErrorLogger;
-import org.neo4j.driver.internal.util.ErrorUtil;
 
 public class ChannelErrorHandler extends ChannelInboundHandlerAdapter {
     private final LoggingProvider logging;
@@ -61,7 +60,11 @@ public class ChannelErrorHandler extends ChannelInboundHandlerAdapter {
         log.log(System.Logger.Level.DEBUG, "Channel is inactive");
 
         var terminationReason = ChannelAttributes.terminationReason(ctx.channel());
-        Throwable error = ErrorUtil.newConnectionTerminatedError(terminationReason);
+        Throwable error = terminationReason == null
+                ? new BoltServiceUnavailableException("Connection to the database terminated. "
+                        + "Please ensure that your database is listening on the correct host and port and that you have compatible encryption settings both on Neo4j server and driver. "
+                        + "Note that the default encryption setting has changed in Neo4j 4.0.")
+                : new BoltServiceUnavailableException("Connection to the database terminated. " + terminationReason);
 
         if (!failed) {
             // channel became inactive not because of a fatal exception that came from exceptionCaught
@@ -85,7 +88,7 @@ public class ChannelErrorHandler extends ChannelInboundHandlerAdapter {
     }
 
     private void logUnexpectedErrorWarning(Throwable error) {
-        if (!(error instanceof ConnectionReadTimeoutException)) {
+        if (!(error instanceof BoltConnectionReadTimeoutException)) {
             errorLog.traceOrDebug("Fatal error occurred in the pipeline", error);
         }
     }
@@ -102,7 +105,7 @@ public class ChannelErrorHandler extends ChannelInboundHandlerAdapter {
         }
 
         if (error instanceof IOException) {
-            return new ServiceUnavailableException("Connection to the database failed", error);
+            return new BoltServiceUnavailableException("Connection to the database failed", error);
         } else {
             return error;
         }

@@ -43,7 +43,7 @@ import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
 import org.neo4j.driver.exceptions.ProtocolException;
 import org.neo4j.driver.internal.InternalNotificationSeverity;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.summary.InternalDatabaseInfo;
 import org.neo4j.driver.internal.summary.InternalGqlStatusObject;
 import org.neo4j.driver.internal.summary.InternalInputPosition;
@@ -93,7 +93,7 @@ public class MetadataExtractor {
 
     public ResultSummary extractSummary(
             Query query,
-            BoltConnection connection,
+            DriverBoltConnection connection,
             long resultAvailableAfter,
             Map<String, Value> metadata,
             boolean legacyNotifications,

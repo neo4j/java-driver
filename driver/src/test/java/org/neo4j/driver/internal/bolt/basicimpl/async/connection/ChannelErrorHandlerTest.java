@@ -34,8 +34,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.ChannelErrorHandler;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.InboundMessageDispatcher;
 
@@ -61,12 +61,12 @@ class ChannelErrorHandlerTest {
     @Test
     void shouldHandleChannelInactive() {
         channel.pipeline().fireChannelInactive();
-        var exceptionCaptor = ArgumentCaptor.forClass(ServiceUnavailableException.class);
+        var exceptionCaptor = ArgumentCaptor.forClass(BoltServiceUnavailableException.class);
 
         then(messageDispatcher).should().handleChannelInactive(exceptionCaptor.capture());
 
         var error = exceptionCaptor.getValue();
-        assertThat(error, instanceOf(ServiceUnavailableException.class));
+        assertThat(error, instanceOf(BoltServiceUnavailableException.class));
         assertThat(error.getMessage(), startsWith("Connection to the database terminated"));
         //        assertFalse(channel.isOpen());
     }
@@ -85,7 +85,7 @@ class ChannelErrorHandlerTest {
         var error2 = exception2.getValue();
 
         assertEquals(originalError, error1);
-        assertThat(error2, instanceOf(ServiceUnavailableException.class));
+        assertThat(error2, instanceOf(BoltServiceUnavailableException.class));
         assertThat(error2.getMessage(), startsWith("Connection to the database terminated"));
         //        assertFalse(channel.isOpen());
     }
@@ -97,10 +97,10 @@ class ChannelErrorHandlerTest {
 
         channel.pipeline().fireChannelInactive();
 
-        var exceptionCaptor = ArgumentCaptor.forClass(ServiceUnavailableException.class);
+        var exceptionCaptor = ArgumentCaptor.forClass(BoltServiceUnavailableException.class);
         then(messageDispatcher).should().handleChannelInactive(exceptionCaptor.capture());
         var error = exceptionCaptor.getValue();
-        assertThat(error, instanceOf(ServiceUnavailableException.class));
+        assertThat(error, instanceOf(BoltServiceUnavailableException.class));
         assertThat(error.getMessage(), startsWith("Connection to the database terminated"));
         assertThat(error.getMessage(), containsString(terminationReason));
         //        assertFalse(channel.isOpen());
@@ -142,7 +142,7 @@ class ChannelErrorHandlerTest {
         var exceptionCaptor = ArgumentCaptor.forClass(RuntimeException.class);
         then(messageDispatcher).should().handleChannelError(exceptionCaptor.capture());
         var error = exceptionCaptor.getValue();
-        assertThat(error, instanceOf(ServiceUnavailableException.class));
+        assertThat(error, instanceOf(BoltServiceUnavailableException.class));
         assertEquals(ioException, error.getCause());
         //        assertFalse(channel.isOpen());
     }

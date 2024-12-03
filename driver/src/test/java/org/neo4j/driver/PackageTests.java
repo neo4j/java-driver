@@ -30,8 +30,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.neo4j.driver.exceptions.Neo4jException;
-import org.neo4j.driver.exceptions.UntrustedServerException;
 import org.neo4j.driver.internal.DriverFactory;
 import org.neo4j.driver.internal.InternalNode;
 import org.neo4j.driver.internal.InternalPath;
@@ -47,7 +45,6 @@ import org.neo4j.driver.internal.bolt.routedimpl.cluster.Rediscovery;
 import org.neo4j.driver.internal.retry.ExponentialBackoffRetryLogic;
 import org.neo4j.driver.internal.types.InternalTypeSystem;
 import org.neo4j.driver.internal.types.TypeConstructor;
-import org.neo4j.driver.internal.util.ErrorUtil;
 import org.neo4j.driver.internal.util.Futures;
 import org.neo4j.driver.types.IsoDuration;
 import org.neo4j.driver.types.MapAccessor;
@@ -103,11 +100,7 @@ class PackageTests {
                         InternalPath.class,
                         InternalPath.SelfContainedSegment.class,
                         IsoDuration.class,
-                        InternalTypeSystem.class,
-                        // exceptions
-                        Neo4jException.class,
-                        ErrorUtil.class,
-                        UntrustedServerException.class)
+                        InternalTypeSystem.class)
                 .map(JavaClass.Predicates::assignableTo)
                 .reduce((one, two) -> DescribedPredicate.or(one, two))
                 .get();

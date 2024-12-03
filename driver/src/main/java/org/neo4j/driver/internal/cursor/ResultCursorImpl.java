@@ -39,11 +39,11 @@ import org.neo4j.driver.exceptions.NoSuchRecordException;
 import org.neo4j.driver.internal.DatabaseBookmark;
 import org.neo4j.driver.internal.FailableCursor;
 import org.neo4j.driver.internal.InternalRecord;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.async.UnmanagedTransaction;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
 import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
@@ -55,7 +55,7 @@ import org.neo4j.driver.internal.util.MetadataExtractor;
 import org.neo4j.driver.summary.ResultSummary;
 
 public class ResultCursorImpl extends AbstractRecordStateResponseHandler
-        implements ResultCursor, FailableCursor, ResponseHandler {
+        implements ResultCursor, FailableCursor, DriverResponseHandler {
     public static final MetadataExtractor METADATA_EXTRACTOR = new MetadataExtractor("t_last");
     private static final ClientException IGNORED_ERROR = new ClientException(
             GqlStatusError.UNKNOWN.getStatus(),
@@ -64,7 +64,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             "A message has been ignored during result streaming.",
             GqlStatusError.DIAGNOSTIC_RECORD,
             null);
-    private final BoltConnection boltConnection;
+    private final DriverBoltConnection boltConnection;
     private final Queue<Record> records = new ArrayDeque<>();
     private final Query query;
     private final long fetchSize;
@@ -98,7 +98,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
     }
 
     public ResultCursorImpl(
-            BoltConnection boltConnection,
+            DriverBoltConnection boltConnection,
             Query query,
             long fetchSize,
             Consumer<DatabaseBookmark> bookmarkConsumer,

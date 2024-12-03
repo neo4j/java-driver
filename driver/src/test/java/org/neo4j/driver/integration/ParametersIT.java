@@ -414,7 +414,7 @@ class ParametersIT {
     private static void expectIOExceptionWithMessage(Value value, String message) {
         var e = assertThrows(ServiceUnavailableException.class, () -> session.run("RETURN {a}", value)
                 .consume());
-        var cause = e.getCause();
+        var cause = e.getCause().getCause();
         assertThat(cause, instanceOf(IOException.class));
         assertThat(cause.getMessage(), equalTo(message));
     }

@@ -42,9 +42,9 @@ import org.neo4j.driver.Driver;
 import org.neo4j.driver.Logging;
 import org.neo4j.driver.MetricsAdapter;
 import org.neo4j.driver.SessionConfig;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.async.LeakLoggingNetworkSession;
 import org.neo4j.driver.internal.async.NetworkSession;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.BootstrapFactory;
 import org.neo4j.driver.internal.metrics.DevNullMetricsProvider;
 import org.neo4j.driver.internal.metrics.InternalMetricsProvider;
@@ -154,7 +154,7 @@ class DriverFactoryTest {
         @Override
         protected SessionFactory createSessionFactory(
                 BoltSecurityPlanManager securityPlanManager,
-                BoltConnectionProvider connectionProvider,
+                DriverBoltConnectionProvider connectionProvider,
                 RetryLogic retryLogic,
                 Config config,
                 AuthTokenManager authTokenManager) {
@@ -180,7 +180,7 @@ class DriverFactoryTest {
         @Override
         protected SessionFactory createSessionFactory(
                 BoltSecurityPlanManager securityPlanManager,
-                BoltConnectionProvider connectionProvider,
+                DriverBoltConnectionProvider connectionProvider,
                 RetryLogic retryLogic,
                 Config config,
                 AuthTokenManager authTokenManager) {

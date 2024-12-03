@@ -34,12 +34,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.AuthorizationExpiredException;
-import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
-import org.neo4j.driver.exceptions.Neo4jException;
-import org.neo4j.driver.exceptions.ProtocolException;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.AuthData;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
@@ -53,7 +47,12 @@ import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.TransactionType;
-import org.neo4j.driver.internal.bolt.api.exception.MessageIgnoredException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltConnectionReadTimeoutException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltProtocolException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
@@ -376,7 +375,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     public CompletionStage<BoltConnection> telemetry(TelemetryApi telemetryApi) {
         return executeInEventLoop(() -> {
                     if (!telemetrySupported()) {
-                        throw new UnsupportedFeatureException("telemetry not supported");
+                        throw new BoltUnsupportedFeatureException("telemetry not supported");
                     } else {
                         messageWriters.add(handler ->
                                 protocol.telemetry(connection, telemetryApi.getValue(), new MessageHandler<>() {
@@ -419,7 +418,7 @@ public final class BoltConnectionImpl implements BoltConnection {
                                 throwable = FutureUtil.completionExceptionCause(throwable);
                                 if (throwable instanceof CodecException
                                         && throwable.getCause() instanceof IOException) {
-                                    var serviceError = new ServiceUnavailableException(
+                                    var serviceError = new BoltServiceUnavailableException(
                                             "Connection to the database failed", throwable.getCause());
                                     forceClose("Connection has been closed due to encoding error")
                                             .whenComplete((ignored1, ignored2) ->
@@ -433,7 +432,7 @@ public final class BoltConnectionImpl implements BoltConnection {
                             }
                         });
                     } else {
-                        throw new ServiceUnavailableException("Connection is closed");
+                        throw new BoltServiceUnavailableException("Connection is closed");
                     }
                 })
                 .thenCompose(ignored -> flushFuture);
@@ -526,18 +525,20 @@ public final class BoltConnectionImpl implements BoltConnection {
     }
 
     private void updateState(Throwable throwable) {
-        if (throwable instanceof ServiceUnavailableException) {
-            if (throwable instanceof ConnectionReadTimeoutException) {
+        if (throwable instanceof BoltServiceUnavailableException) {
+            if (throwable instanceof BoltConnectionReadTimeoutException) {
                 stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.ERROR);
             } else {
                 stateRef.set(BoltConnectionState.CLOSED);
             }
-        } else if (throwable instanceof Neo4jException) {
-            if (throwable instanceof AuthorizationExpiredException) {
+        } else if (throwable instanceof BoltFailureException boltFailureException) {
+            if ("Neo.ClientError.Security.AuthorizationExpired".equals(boltFailureException.code())) {
                 stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.ERROR);
             } else {
                 stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.FAILURE);
             }
+        } else if (throwable instanceof MessageIgnoredException) {
+            stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.FAILURE);
         } else {
             stateRef.updateAndGet(state -> switch (state) {
                 case OPEN, FAILURE, ERROR -> BoltConnectionState.ERROR;
@@ -565,9 +566,9 @@ public final class BoltConnectionImpl implements BoltConnection {
             if (!(throwable instanceof MessageIgnoredException)) {
                 if (!summariesFuture.isDone()) {
                     runIgnoringError(() -> delegate.onError(throwable));
-                    if (!(throwable instanceof Neo4jException)
-                            || throwable instanceof ServiceUnavailableException
-                            || throwable instanceof ProtocolException) {
+                    if (!(throwable instanceof BoltException)
+                            || throwable instanceof BoltServiceUnavailableException
+                            || throwable instanceof BoltProtocolException) {
                         // assume unrecoverable error, ensure onComplete
                         expectedSummaries = 1;
                     }

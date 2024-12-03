@@ -60,11 +60,11 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.stubbing.Answer;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.GqlError;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
+import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.bolt.basicimpl.async.connection.ChannelAttributes;
@@ -538,7 +538,7 @@ public class BoltProtocolV3Test {
     }
 
     protected void testDatabaseNameSupport(boolean autoCommitTx) {
-        ClientException e;
+        BoltClientException e;
         if (autoCommitTx) {
             var connection = mock(Connection.class);
             given(connection.protocol()).willReturn(protocol);
@@ -565,7 +565,7 @@ public class BoltProtocolV3Test {
                             handler,
                             NoopLoggingProvider.INSTANCE)
                     .toCompletableFuture();
-            e = (ClientException)
+            e = (BoltClientException)
                     assertThrows(CompletionException.class, future::join).getCause();
         } else {
             var connection = mock(Connection.class);
@@ -592,7 +592,7 @@ public class BoltProtocolV3Test {
                             handler,
                             NoopLoggingProvider.INSTANCE)
                     .toCompletableFuture();
-            e = (ClientException)
+            e = (BoltClientException)
                     assertThrows(CompletionException.class, future::join).getCause();
         }
 

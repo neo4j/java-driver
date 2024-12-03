@@ -47,7 +47,7 @@ import org.neo4j.driver.Query;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
 import org.neo4j.driver.exceptions.value.Uncoercible;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.summary.InternalInputPosition;
@@ -471,12 +471,12 @@ class MetadataExtractorTest {
         return new Query("RETURN 1");
     }
 
-    private static BoltConnection connectionMock() {
+    private static DriverBoltConnection connectionMock() {
         return connectionMock(BoltServerAddress.LOCAL_DEFAULT);
     }
 
-    private static BoltConnection connectionMock(BoltServerAddress address) {
-        var connection = mock(BoltConnection.class);
+    private static DriverBoltConnection connectionMock(BoltServerAddress address) {
+        var connection = mock(DriverBoltConnection.class);
         when(connection.serverAddress()).thenReturn(address);
         when(connection.protocolVersion()).thenReturn(new BoltProtocolVersion(4, 3));
         when(connection.serverAgent()).thenReturn("Neo4j/4.2.5");

@@ -40,8 +40,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.UntrustedServerException;
 import org.neo4j.driver.internal.bolt.NoopLoggingProvider;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUntrustedServerException;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.ChannelErrorHandler;
 import org.neo4j.driver.internal.bolt.basicimpl.async.inbound.InboundMessageDispatcher;
 import org.neo4j.driver.internal.bolt.basicimpl.async.outbound.OutboundMessageHandler;
@@ -85,7 +85,7 @@ class HelloResponseHandlerTest {
         var handler = new HelloResponseHandler(agentFuture, channel, mock(Clock.class), latestAuth);
 
         var metadata = metadata(null, "bolt-1");
-        assertThrows(UntrustedServerException.class, () -> handler.onSuccess(metadata));
+        assertThrows(BoltUntrustedServerException.class, () -> handler.onSuccess(metadata));
 
         assertTrue(agentFuture.isCompletedExceptionally()); // initialization failed
         assertTrue(channel.closeFuture().isDone()); // channel was closed
@@ -98,7 +98,7 @@ class HelloResponseHandlerTest {
         var handler = new HelloResponseHandler(agentFuture, channel, mock(Clock.class), latestAuth);
 
         var metadata = metadata(Values.NULL, "bolt-x");
-        assertThrows(UntrustedServerException.class, () -> handler.onSuccess(metadata));
+        assertThrows(BoltUntrustedServerException.class, () -> handler.onSuccess(metadata));
 
         assertTrue(agentFuture.isCompletedExceptionally()); // initialization failed
         assertTrue(channel.closeFuture().isDone()); // channel was closed
@@ -111,7 +111,7 @@ class HelloResponseHandlerTest {
         var handler = new HelloResponseHandler(agentFuture, channel, mock(Clock.class), latestAuth);
 
         var metadata = metadata("WrongServerVersion", "bolt-x");
-        assertThrows(UntrustedServerException.class, () -> handler.onSuccess(metadata));
+        assertThrows(BoltUntrustedServerException.class, () -> handler.onSuccess(metadata));
 
         assertTrue(agentFuture.isCompletedExceptionally()); // initialization failed
         assertTrue(channel.closeFuture().isDone()); // channel was closed

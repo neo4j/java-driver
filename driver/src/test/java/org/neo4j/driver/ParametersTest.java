@@ -39,8 +39,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.internal.InternalRecord;
 import org.neo4j.driver.internal.InternalSession;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.async.NetworkSession;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.retry.RetryLogic;
 import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
 
@@ -100,7 +100,7 @@ class ParametersTest {
     }
 
     private Session mockedSession() {
-        var provider = mock(BoltConnectionProvider.class);
+        var provider = mock(DriverBoltConnectionProvider.class);
         var retryLogic = mock(RetryLogic.class);
         var session = new NetworkSession(
                 BoltSecurityPlanManager.insecure(),

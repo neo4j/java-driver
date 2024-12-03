@@ -55,8 +55,8 @@ import org.neo4j.driver.async.AsyncTransaction;
 import org.neo4j.driver.async.ResultCursor;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.InternalRecord;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
@@ -67,16 +67,16 @@ import org.neo4j.driver.internal.bolt.basicimpl.messaging.v4.BoltProtocolV4;
 import org.neo4j.driver.internal.value.IntegerValue;
 
 class InternalAsyncTransactionTest {
-    private BoltConnection connection;
+    private DriverBoltConnection connection;
     private InternalAsyncSession session;
 
     @BeforeEach
     void setUp() {
         connection = connectionMock(BoltProtocolV4.INSTANCE.version());
         given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
-        var connectionProvider = mock(BoltConnectionProvider.class);
+        var connectionProvider = mock(DriverBoltConnectionProvider.class);
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .willAnswer((Answer<CompletionStage<BoltConnection>>) invocation -> {
+                .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var database = (DatabaseName) invocation.getArguments()[1];
                     @SuppressWarnings("unchecked")
                     var databaseConsumer = (Consumer<DatabaseName>) invocation.getArguments()[8];
@@ -102,9 +102,9 @@ class InternalAsyncTransactionTest {
     void shouldFlushOnRun(Function<AsyncTransaction, CompletionStage<ResultCursor>> runReturnOne) {
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
-        given(connection.run(any(), any())).willAnswer((Answer<CompletionStage<BoltConnection>>)
+        given(connection.run(any(), any())).willAnswer((Answer<CompletionStage<DriverBoltConnection>>)
                 invocation -> CompletableFuture.completedStage(connection));
-        given(connection.pull(anyLong(), anyLong())).willAnswer((Answer<CompletionStage<BoltConnection>>)
+        given(connection.pull(anyLong(), anyLong())).willAnswer((Answer<CompletionStage<DriverBoltConnection>>)
                 invocation -> CompletableFuture.completedStage(connection));
         setupConnectionAnswers(
                 connection,
@@ -130,7 +130,7 @@ class InternalAsyncTransactionTest {
     void shouldCommit() {
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
-        given(connection.commit()).willAnswer((Answer<CompletionStage<BoltConnection>>)
+        given(connection.commit()).willAnswer((Answer<CompletionStage<DriverBoltConnection>>)
                 invocation -> CompletableFuture.completedStage(connection));
         setupConnectionAnswers(
                 connection,
@@ -157,7 +157,7 @@ class InternalAsyncTransactionTest {
     void shouldRollback() {
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
-        given(connection.rollback()).willAnswer((Answer<CompletionStage<BoltConnection>>)
+        given(connection.rollback()).willAnswer((Answer<CompletionStage<DriverBoltConnection>>)
                 invocation -> CompletableFuture.completedStage(connection));
         setupConnectionAnswers(
                 connection,
@@ -183,7 +183,7 @@ class InternalAsyncTransactionTest {
     void shouldReleaseConnectionWhenFailedToCommit() {
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
-        given(connection.commit()).willAnswer((Answer<CompletionStage<BoltConnection>>)
+        given(connection.commit()).willAnswer((Answer<CompletionStage<DriverBoltConnection>>)
                 invocation -> CompletableFuture.completedStage(connection));
         setupConnectionAnswers(
                 connection,
@@ -208,7 +208,7 @@ class InternalAsyncTransactionTest {
     void shouldReleaseConnectionWhenFailedToRollback() {
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(completedFuture(connection));
-        given(connection.rollback()).willAnswer((Answer<CompletionStage<BoltConnection>>)
+        given(connection.rollback()).willAnswer((Answer<CompletionStage<DriverBoltConnection>>)
                 invocation -> CompletableFuture.completedStage(connection));
         setupConnectionAnswers(
                 connection,

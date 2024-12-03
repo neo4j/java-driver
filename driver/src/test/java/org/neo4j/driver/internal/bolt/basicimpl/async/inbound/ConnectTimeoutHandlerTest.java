@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.exceptions.ServiceUnavailableException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 
 class ConnectTimeoutHandlerTest {
     private final EmbeddedChannel channel = new EmbeddedChannel();
@@ -41,7 +41,7 @@ class ConnectTimeoutHandlerTest {
         Thread.sleep(timeoutMillis * 4);
         channel.runPendingTasks();
 
-        var error = assertThrows(ServiceUnavailableException.class, channel::checkException);
+        var error = assertThrows(BoltServiceUnavailableException.class, channel::checkException);
         assertEquals(error.getMessage(), "Unable to establish connection in " + timeoutMillis + "ms");
     }
 
@@ -54,7 +54,7 @@ class ConnectTimeoutHandlerTest {
         Thread.sleep(timeoutMillis * 4);
         channel.runPendingTasks();
 
-        var error = assertThrows(ServiceUnavailableException.class, channel::checkException);
+        var error = assertThrows(BoltServiceUnavailableException.class, channel::checkException);
         assertEquals(error.getMessage(), "Unable to establish connection in " + timeoutMillis + "ms");
 
         // sleep even more

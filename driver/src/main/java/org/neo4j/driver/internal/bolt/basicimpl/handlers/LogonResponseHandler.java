@@ -23,7 +23,7 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.exceptions.ProtocolException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltProtocolException;
 import org.neo4j.driver.internal.bolt.basicimpl.spi.ResponseHandler;
 
 public class LogonResponseHandler implements ResponseHandler {
@@ -57,6 +57,6 @@ public class LogonResponseHandler implements ResponseHandler {
 
     @Override
     public void onRecord(Value[] fields) {
-        future.completeExceptionally(new ProtocolException("Records are not supported on LOGON"));
+        future.completeExceptionally(new BoltProtocolException("Records are not supported on LOGON"));
     }
 }

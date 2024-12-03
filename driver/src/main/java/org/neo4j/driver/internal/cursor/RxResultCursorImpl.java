@@ -39,10 +39,10 @@ import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.TransactionNestingException;
 import org.neo4j.driver.internal.DatabaseBookmark;
 import org.neo4j.driver.internal.InternalRecord;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
 import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
@@ -51,7 +51,8 @@ import org.neo4j.driver.internal.util.MetadataExtractor;
 import org.neo4j.driver.summary.GqlStatusObject;
 import org.neo4j.driver.summary.ResultSummary;
 
-public class RxResultCursorImpl extends AbstractRecordStateResponseHandler implements RxResultCursor, ResponseHandler {
+public class RxResultCursorImpl extends AbstractRecordStateResponseHandler
+        implements RxResultCursor, DriverResponseHandler {
     private static final MetadataExtractor METADATA_EXTRACTOR = new MetadataExtractor("t_last");
     private static final ClientException IGNORED_ERROR = new ClientException(
             GqlStatusError.UNKNOWN.getStatus(),
@@ -79,7 +80,7 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
         }
     };
     private final Logger log;
-    private final BoltConnection boltConnection;
+    private final DriverBoltConnection boltConnection;
     private final Query query;
     private final RunSummary runSummary;
     private final Throwable runError;
@@ -108,7 +109,7 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
     }
 
     public RxResultCursorImpl(
-            BoltConnection boltConnection,
+            DriverBoltConnection boltConnection,
             Query query,
             RunSummary runSummary,
             Throwable runError,
@@ -259,7 +260,7 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler imple
         var resetFuture = new CompletableFuture<Void>();
         boltConnection
                 .reset()
-                .thenCompose(conn -> conn.flush(new ResponseHandler() {
+                .thenCompose(conn -> conn.flush(new DriverResponseHandler() {
                     Throwable throwable = null;
 
                     @Override

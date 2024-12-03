@@ -17,10 +17,9 @@
 package org.neo4j.driver.internal.bolt.api.exception;
 
 import java.io.Serial;
-import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 
-public class MinVersionAcquisitionException extends Neo4jException {
+public class MinVersionAcquisitionException extends BoltException {
     @Serial
     private static final long serialVersionUID = 2620821821322630443L;
 

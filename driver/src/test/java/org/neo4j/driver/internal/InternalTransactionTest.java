@@ -50,31 +50,31 @@ import org.neo4j.driver.Query;
 import org.neo4j.driver.Result;
 import org.neo4j.driver.Transaction;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RollbackSummary;
 import org.neo4j.driver.internal.value.IntegerValue;
 
 class InternalTransactionTest {
-    private BoltConnection connection;
+    private DriverBoltConnection connection;
     private Transaction tx;
 
     @BeforeEach
     @SuppressWarnings("resource")
     void setUp() {
         connection = connectionMock(new BoltProtocolVersion(4, 0));
-        var connectionProvider = mock(BoltConnectionProvider.class);
+        var connectionProvider = mock(DriverBoltConnectionProvider.class);
         given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedFuture(connection));
         given(connection.beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             if (handler != null) {
                 handler.onBeginSummary(mock(BeginSummary.class));
                 handler.onComplete();
@@ -109,7 +109,7 @@ class InternalTransactionTest {
     void shouldCommit() {
         given(connection.commit()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onCommitSummary(mock(CommitSummary.class));
             handler.onComplete();
             return CompletableFuture.completedStage(null);
@@ -127,7 +127,7 @@ class InternalTransactionTest {
     void shouldRollbackByDefault() {
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onRollbackSummary(mock(RollbackSummary.class));
             handler.onComplete();
             return CompletableFuture.completedStage(null);
@@ -144,7 +144,7 @@ class InternalTransactionTest {
     void shouldRollback() {
         given(connection.rollback()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
-            var handler = (ResponseHandler) invocation.getArgument(0);
+            var handler = (DriverResponseHandler) invocation.getArgument(0);
             handler.onRollbackSummary(mock(RollbackSummary.class));
             handler.onComplete();
             return CompletableFuture.completedStage(null);

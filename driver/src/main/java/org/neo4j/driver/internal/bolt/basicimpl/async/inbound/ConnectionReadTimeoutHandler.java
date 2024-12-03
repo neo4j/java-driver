@@ -19,7 +19,7 @@ package org.neo4j.driver.internal.bolt.basicimpl.async.inbound;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import java.util.concurrent.TimeUnit;
-import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltConnectionReadTimeoutException;
 
 public class ConnectionReadTimeoutHandler extends ReadTimeoutHandler {
     private boolean triggered;
@@ -31,7 +31,9 @@ public class ConnectionReadTimeoutHandler extends ReadTimeoutHandler {
     @Override
     protected void readTimedOut(ChannelHandlerContext ctx) {
         if (!triggered) {
-            ctx.fireExceptionCaught(ConnectionReadTimeoutException.INSTANCE);
+            ctx.fireExceptionCaught(
+                    new BoltConnectionReadTimeoutException(
+                            "Connection read timed out due to it taking longer than the server-supplied timeout value via configuration hint."));
             ctx.close();
             triggered = true;
         }

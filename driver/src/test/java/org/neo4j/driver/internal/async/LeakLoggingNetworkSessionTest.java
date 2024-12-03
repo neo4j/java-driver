@@ -46,8 +46,8 @@ import org.neo4j.driver.Logging;
 import org.neo4j.driver.NotificationConfig;
 import org.neo4j.driver.Query;
 import org.neo4j.driver.TransactionConfig;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
@@ -129,7 +129,7 @@ class LeakLoggingNetworkSessionTest {
         finalizeMethod.invoke(session);
     }
 
-    private static LeakLoggingNetworkSession newSession(Logging logging, BoltConnection connection) {
+    private static LeakLoggingNetworkSession newSession(Logging logging, DriverBoltConnection connection) {
         return new LeakLoggingNetworkSession(
                 BoltSecurityPlanManager.insecure(),
                 connectionProviderMock(connection),
@@ -148,8 +148,8 @@ class LeakLoggingNetworkSessionTest {
                 AuthTokenManagers.basic(AuthTokens::none));
     }
 
-    private static BoltConnectionProvider connectionProviderMock(BoltConnection connection) {
-        var provider = mock(BoltConnectionProvider.class);
+    private static DriverBoltConnectionProvider connectionProviderMock(DriverBoltConnection connection) {
+        var provider = mock(DriverBoltConnectionProvider.class);
         when(provider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(CompletableFuture.completedFuture(connection));
         return provider;

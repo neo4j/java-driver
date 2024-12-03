@@ -34,8 +34,6 @@ import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.Values;
-import org.neo4j.driver.exceptions.Neo4jException;
-import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.internal.InternalRecord;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
@@ -47,6 +45,8 @@ import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
+import org.neo4j.driver.internal.bolt.api.exception.BoltException;
+import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
 import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
@@ -316,7 +316,7 @@ public class BoltProtocolV3 implements BoltProtocol {
 
     @Override
     public CompletionStage<Void> telemetry(Connection connection, Integer api, MessageHandler<Void> handler) {
-        return CompletableFuture.failedStage(new UnsupportedFeatureException("telemetry not supported"));
+        return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("telemetry not supported"));
     }
 
     @SuppressWarnings("DuplicatedCode")
@@ -417,10 +417,10 @@ public class BoltProtocolV3 implements BoltProtocol {
         return false;
     }
 
-    protected Neo4jException verifyNotificationConfigSupported(NotificationConfig notificationConfig) {
-        Neo4jException exception = null;
+    protected BoltException verifyNotificationConfigSupported(NotificationConfig notificationConfig) {
+        BoltException exception = null;
         if (notificationConfig != null && !notificationConfig.equals(NotificationConfig.defaultConfig())) {
-            exception = new UnsupportedFeatureException(String.format(
+            exception = new BoltUnsupportedFeatureException(String.format(
                     "Notification configuration is not supported on Bolt %s",
                     version().toString()));
         }

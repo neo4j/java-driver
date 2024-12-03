@@ -21,20 +21,20 @@ import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.AuthTokenManager;
 import org.neo4j.driver.exceptions.SecurityException;
 import org.neo4j.driver.exceptions.SecurityRetryableException;
-import org.neo4j.driver.internal.bolt.api.BoltConnection;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.security.InternalAuthToken;
 
 final class BoltConnectionWithAuthTokenManager extends DelegatingBoltConnection {
     private final AuthTokenManager authTokenManager;
 
-    public BoltConnectionWithAuthTokenManager(BoltConnection delegate, AuthTokenManager authTokenManager) {
+    public BoltConnectionWithAuthTokenManager(DriverBoltConnection delegate, AuthTokenManager authTokenManager) {
         super(delegate);
         this.authTokenManager = Objects.requireNonNull(authTokenManager);
     }
 
     @Override
-    public CompletionStage<Void> flush(ResponseHandler handler) {
+    public CompletionStage<Void> flush(DriverResponseHandler handler) {
         return delegate.flush(new ErrorMappingResponseHandler(handler, this::mapSecurityError));
     }
 

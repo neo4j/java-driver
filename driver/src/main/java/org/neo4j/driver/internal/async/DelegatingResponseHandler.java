@@ -18,7 +18,7 @@ package org.neo4j.driver.internal.async;
 
 import java.util.Objects;
 import org.neo4j.driver.Value;
-import org.neo4j.driver.internal.bolt.api.ResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.CommitSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
@@ -31,10 +31,10 @@ import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.bolt.api.summary.TelemetrySummary;
 
-abstract class DelegatingResponseHandler implements ResponseHandler {
-    protected final ResponseHandler delegate;
+abstract class DelegatingResponseHandler implements DriverResponseHandler {
+    protected final DriverResponseHandler delegate;
 
-    DelegatingResponseHandler(ResponseHandler delegate) {
+    DelegatingResponseHandler(DriverResponseHandler delegate) {
         this.delegate = Objects.requireNonNull(delegate);
     }
 
