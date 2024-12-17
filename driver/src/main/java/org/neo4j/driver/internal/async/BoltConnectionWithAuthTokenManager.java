@@ -24,6 +24,7 @@ import org.neo4j.driver.exceptions.SecurityRetryableException;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.security.InternalAuthToken;
+import org.neo4j.driver.internal.value.BoltValueFactory;
 
 final class BoltConnectionWithAuthTokenManager extends DelegatingBoltConnection {
     private final AuthTokenManager authTokenManager;
@@ -43,7 +44,8 @@ final class BoltConnectionWithAuthTokenManager extends DelegatingBoltConnection 
             var authData = delegate.authData().toCompletableFuture().getNow(null);
             if (authData != null
                     && authTokenManager.handleSecurityException(
-                            new InternalAuthToken(authData.authMap()), securityException)) {
+                            new InternalAuthToken(BoltValueFactory.getInstance().toDriverMap(authData.authMap())),
+                            securityException)) {
                 throwable = new SecurityRetryableException(securityException);
             }
         }

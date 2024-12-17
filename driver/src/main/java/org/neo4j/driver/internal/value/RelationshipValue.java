@@ -34,4 +34,9 @@ public class RelationshipValue extends EntityValueAdapter<Relationship> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.RELATIONSHIP();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.RELATIONSHIP);
+    }
 }

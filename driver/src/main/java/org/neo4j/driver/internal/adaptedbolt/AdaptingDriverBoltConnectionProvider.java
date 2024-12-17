@@ -33,16 +33,22 @@ import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.value.BoltValueFactory;
 
 public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectionProvider {
     private final BoltConnectionProvider delegate;
     private final ErrorMapper errorMapper;
+    private final BoltValueFactory boltValueFactory;
     private final boolean routed;
 
     public AdaptingDriverBoltConnectionProvider(
-            BoltConnectionProvider delegate, ErrorMapper errorMapper, boolean routed) {
+            BoltConnectionProvider delegate,
+            ErrorMapper errorMapper,
+            BoltValueFactory boltValueFactory,
+            boolean routed) {
         this.delegate = Objects.requireNonNull(delegate);
         this.errorMapper = Objects.requireNonNull(errorMapper);
+        this.boltValueFactory = Objects.requireNonNull(boltValueFactory);
         this.routed = routed;
     }
 
@@ -72,7 +78,7 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
         return delegate.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        () -> authMapStageSupplier.get().thenApply(boltValueFactory::toBoltMap),
                         mode,
                         bookmarks,
                         impersonatedUser,
@@ -82,22 +88,26 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
                 .exceptionally(errorMapper::mapAndTrow)
                 .thenApply(boltConnection -> new AdaptingDriverBoltConnection(
                         boltConnection,
-                        routed ? new RoutedErrorMapper(boltConnection.serverAddress(), mode) : errorMapper));
+                        routed ? new RoutedErrorMapper(boltConnection.serverAddress(), mode) : errorMapper,
+                        boltValueFactory));
     }
 
     @Override
     public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.verifyConnectivity(securityPlan, authMap).exceptionally(errorMapper::mapAndTrow);
+        return delegate.verifyConnectivity(securityPlan, boltValueFactory.toBoltMap(authMap))
+                .exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override
     public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsMultiDb(securityPlan, authMap).exceptionally(errorMapper::mapAndTrow);
+        return delegate.supportsMultiDb(securityPlan, boltValueFactory.toBoltMap(authMap))
+                .exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override
     public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsSessionAuth(securityPlan, authMap).exceptionally(errorMapper::mapAndTrow);
+        return delegate.supportsSessionAuth(securityPlan, boltValueFactory.toBoltMap(authMap))
+                .exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override

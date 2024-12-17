@@ -34,4 +34,9 @@ public class LocalTimeValue extends ObjectValueAdapter<LocalTime> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.LOCAL_TIME();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.LOCAL_TIME);
+    }
 }

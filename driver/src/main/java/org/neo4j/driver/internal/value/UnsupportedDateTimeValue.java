@@ -80,4 +80,9 @@ public class UnsupportedDateTimeValue extends ValueAdapter {
         }
         return newException;
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.DATE_TIME);
+    }
 }

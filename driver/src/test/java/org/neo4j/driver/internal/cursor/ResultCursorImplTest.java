@@ -28,11 +28,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.MockitoAnnotations.openMocks;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -44,11 +44,10 @@ import org.neo4j.driver.exceptions.NoSuchRecordException;
 import org.neo4j.driver.internal.DatabaseBookmark;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
+import org.neo4j.driver.internal.adaptedbolt.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
-import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
-import org.neo4j.driver.internal.bolt.basicimpl.handlers.PullResponseHandlerImpl;
 
 class ResultCursorImplTest {
     ResultCursorImpl cursor;
@@ -61,9 +60,6 @@ class ResultCursorImplTest {
 
     @Mock
     RunSummary runSummary;
-
-    @Mock
-    Supplier<Throwable> termSupplier;
 
     final Query query = new Query("query");
     final long fetchSize = 1000;
@@ -80,7 +76,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldNextAsync() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
             var handler = (DriverResponseHandler) invocation.getArgument(0);
@@ -108,7 +104,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailNextAsyncOnFlushError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         var error = new RuntimeException("message");
         given(connection.flush(any()))
@@ -133,7 +129,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailSingleAsync() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
@@ -153,7 +149,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailSingleAsyncOnError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
@@ -172,7 +168,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailSingleAsyncOnFlushError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         var error = new RuntimeException("message");
@@ -187,7 +183,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFetchMore() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
@@ -212,7 +208,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldListAsync() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         given(connection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocation -> {
@@ -230,7 +226,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailListAsyncOnError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
@@ -249,7 +245,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailListAsyncOnFlushError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         var error = new RuntimeException("message");
@@ -264,7 +260,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailPeekAsyncOnError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
@@ -283,7 +279,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailListPeekOnFlushError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.pull(0, fetchSize)).willReturn(CompletableFuture.completedStage(connection));
         var error = new RuntimeException("message");
@@ -298,7 +294,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailConsumeAsyncOnError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.discard(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         var error = new Neo4jException("code", "message");
@@ -317,7 +313,7 @@ class ResultCursorImplTest {
 
     @Test
     void shouldFailConsumeAsyncOnFlushError() {
-        cursor.onPullSummary(new PullResponseHandlerImpl.PullSummaryImpl(true, Collections.emptyMap()));
+        cursor.onPullSummary(new PullSummaryImpl(true, Collections.emptyMap()));
         given(connection.serverAddress()).willReturn(BoltServerAddress.LOCAL_DEFAULT);
         given(connection.discard(0, -1)).willReturn(CompletableFuture.completedStage(connection));
         var error = new RuntimeException("message");
@@ -329,4 +325,6 @@ class ResultCursorImplTest {
         var exception = assertThrows(CompletionException.class, future::join);
         assertEquals(error, exception.getCause());
     }
+
+    public record PullSummaryImpl(boolean hasMore, Map<String, Value> metadata) implements PullSummary {}
 }

@@ -115,4 +115,9 @@ public class ListValue extends ValueAdapter {
     public int hashCode() {
         return Arrays.hashCode(values);
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.LIST);
+    }
 }

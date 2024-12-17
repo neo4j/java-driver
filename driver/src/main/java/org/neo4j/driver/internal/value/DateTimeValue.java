@@ -40,4 +40,9 @@ public class DateTimeValue extends ObjectValueAdapter<ZonedDateTime> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.DATE_TIME();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.DATE_TIME);
+    }
 }

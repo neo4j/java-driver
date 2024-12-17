@@ -84,4 +84,9 @@ public class BytesValue extends ValueAdapter {
         }
         return s.toString();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.BYTES);
+    }
 }

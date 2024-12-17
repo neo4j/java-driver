@@ -30,13 +30,12 @@ module org.neo4j.driver {
     exports org.neo4j.driver.exceptions;
     exports org.neo4j.driver.exceptions.value;
 
+    requires org.neo4j.bolt.api;
+    requires org.neo4j.bolt.netty;
+    requires org.neo4j.bolt.pooled;
+    requires org.neo4j.bolt.routed;
     requires reactor.core;
     requires io.netty.common;
-    requires io.netty.handler;
-    requires io.netty.transport;
-    requires io.netty.buffer;
-    requires io.netty.codec;
-    requires io.netty.resolver;
     requires transitive java.logging;
     requires transitive org.reactivestreams;
     requires static micrometer.core;

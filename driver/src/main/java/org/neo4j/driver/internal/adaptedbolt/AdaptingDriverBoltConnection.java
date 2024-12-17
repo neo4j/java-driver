@@ -32,14 +32,18 @@ import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.TransactionType;
+import org.neo4j.driver.internal.value.BoltValueFactory;
 
 final class AdaptingDriverBoltConnection implements DriverBoltConnection {
     private final BoltConnection connection;
     private final ErrorMapper errorMapper;
+    private final BoltValueFactory boltValueFactory;
 
-    AdaptingDriverBoltConnection(BoltConnection connection, ErrorMapper errorMapper) {
+    AdaptingDriverBoltConnection(
+            BoltConnection connection, ErrorMapper errorMapper, BoltValueFactory boltValueFactory) {
         this.connection = Objects.requireNonNull(connection);
         this.errorMapper = Objects.requireNonNull(errorMapper);
+        this.boltValueFactory = Objects.requireNonNull(boltValueFactory);
     }
 
     @Override
@@ -75,7 +79,7 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
                         bookmarks,
                         transactionType,
                         txTimeout,
-                        txMetadata,
+                        boltValueFactory.toBoltMap(txMetadata),
                         txType,
                         notificationConfig)
                 .exceptionally(errorMapper::mapAndTrow)
@@ -100,9 +104,9 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
                         impersonatedUser,
                         bookmarks,
                         query,
-                        parameters,
+                        boltValueFactory.toBoltMap(parameters),
                         txTimeout,
-                        txMetadata,
+                        boltValueFactory.toBoltMap(txMetadata),
                         notificationConfig)
                 .exceptionally(errorMapper::mapAndTrow)
                 .thenApply(ignored -> this);
@@ -111,7 +115,7 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
     @Override
     public CompletionStage<DriverBoltConnection> run(String query, Map<String, Value> parameters) {
         return connection
-                .run(query, parameters)
+                .run(query, boltValueFactory.toBoltMap(parameters))
                 .exceptionally(errorMapper::mapAndTrow)
                 .thenApply(ignored -> this);
     }
@@ -154,7 +158,10 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
 
     @Override
     public CompletionStage<DriverBoltConnection> logon(Map<String, Value> authMap) {
-        return connection.logon(authMap).exceptionally(errorMapper::mapAndTrow).thenApply(ignored -> this);
+        return connection
+                .logon(boltValueFactory.toBoltMap(authMap))
+                .exceptionally(errorMapper::mapAndTrow)
+                .thenApply(ignored -> this);
     }
 
     @Override
@@ -173,7 +180,7 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
     @Override
     public CompletionStage<Void> flush(DriverResponseHandler handler) {
         return connection
-                .flush(new AdaptingDriverResponseHandler(handler, errorMapper))
+                .flush(new AdaptingDriverResponseHandler(handler, errorMapper, boltValueFactory))
                 .exceptionally(errorMapper::mapAndTrow);
     }
 

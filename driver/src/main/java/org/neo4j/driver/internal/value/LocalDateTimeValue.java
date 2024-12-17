@@ -34,4 +34,9 @@ public class LocalDateTimeValue extends ObjectValueAdapter<LocalDateTime> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.LOCAL_DATE_TIME();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.LOCAL_DATE_TIME);
+    }
 }

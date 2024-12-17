@@ -34,4 +34,9 @@ public class NodeValue extends EntityValueAdapter<Node> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.NODE();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.NODE);
+    }
 }

@@ -72,6 +72,11 @@ public abstract class BooleanValue extends ValueAdapter {
         public String toString() {
             return "TRUE";
         }
+
+        @Override
+        public BoltValue asBoltValue() {
+            return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.BOOLEAN);
+        }
     }
 
     private static class FalseValue extends BooleanValue {
@@ -99,6 +104,11 @@ public abstract class BooleanValue extends ValueAdapter {
         @Override
         public String toString() {
             return "FALSE";
+        }
+
+        @Override
+        public BoltValue asBoltValue() {
+            return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.BOOLEAN);
         }
     }
 }

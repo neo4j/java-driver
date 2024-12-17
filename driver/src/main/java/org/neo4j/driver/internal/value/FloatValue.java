@@ -95,4 +95,9 @@ public class FloatValue extends NumberValueAdapter<Double> {
     public String toString() {
         return Double.toString(val);
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.FLOAT);
+    }
 }

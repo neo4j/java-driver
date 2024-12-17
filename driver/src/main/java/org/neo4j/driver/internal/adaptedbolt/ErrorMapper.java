@@ -37,7 +37,7 @@ import org.neo4j.driver.exceptions.TransactionTerminatedException;
 import org.neo4j.driver.exceptions.TransientException;
 import org.neo4j.driver.exceptions.UnsupportedFeatureException;
 import org.neo4j.driver.exceptions.UntrustedServerException;
-import org.neo4j.driver.internal.bolt.api.GqlStatusError;
+import org.neo4j.driver.internal.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltConnectionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltConnectionReadTimeoutException;
@@ -50,9 +50,11 @@ import org.neo4j.driver.internal.bolt.api.exception.BoltTransientException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltUntrustedServerException;
 import org.neo4j.driver.internal.util.Futures;
+import org.neo4j.driver.internal.value.BoltValueFactory;
 
 public class ErrorMapper {
     private static final ErrorMapper INSTANCE = new ErrorMapper();
+    private static final BoltValueFactory BOLT_VALUE_FACTORY = BoltValueFactory.getInstance();
 
     public static ErrorMapper getInstance() {
         return INSTANCE;
@@ -147,7 +149,7 @@ public class ErrorMapper {
                             boltFailureException.statusDescription(),
                             "Neo.ClientError.Transaction.Terminated",
                             boltFailureException.getMessage(),
-                            boltFailureException.diagnosticRecord(),
+                            BOLT_VALUE_FACTORY.toDriverMap(boltFailureException.diagnosticRecord()),
                             nested);
                 } else if ("Neo.TransientError.Transaction.LockClientStopped".equals(code)) {
                     yield new ClientException(
@@ -155,7 +157,7 @@ public class ErrorMapper {
                             boltFailureException.statusDescription(),
                             "Neo.ClientError.Transaction.LockClientStopped",
                             boltFailureException.getMessage(),
-                            boltFailureException.diagnosticRecord(),
+                            BOLT_VALUE_FACTORY.toDriverMap(boltFailureException.diagnosticRecord()),
                             nested);
                 } else {
                     yield mapToNeo4jException(TransientException::new, boltFailureException, nested);
@@ -171,7 +173,7 @@ public class ErrorMapper {
                 boltGqlErrorException.statusDescription(),
                 "N/A",
                 boltGqlErrorException.getMessage(),
-                boltGqlErrorException.diagnosticRecord(),
+                BOLT_VALUE_FACTORY.toDriverMap(boltGqlErrorException.diagnosticRecord()),
                 boltGqlErrorException.gqlCause().map(this::mapGqlCause).orElse(null));
     }
 
@@ -222,7 +224,7 @@ public class ErrorMapper {
                 boltFailureException.statusDescription(),
                 boltFailureException.code(),
                 boltFailureException.getMessage(),
-                boltFailureException.diagnosticRecord(),
+                BOLT_VALUE_FACTORY.toDriverMap(boltFailureException.diagnosticRecord()),
                 cause);
     }
 

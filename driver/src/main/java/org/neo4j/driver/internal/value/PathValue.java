@@ -39,4 +39,9 @@ public class PathValue extends ObjectValueAdapter<Path> {
     public Type type() {
         return InternalTypeSystem.TYPE_SYSTEM.PATH();
     }
+
+    @Override
+    public BoltValue asBoltValue() {
+        return new BoltValue(this, org.neo4j.driver.internal.bolt.api.values.Type.PATH);
+    }
 }
