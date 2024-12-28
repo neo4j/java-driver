@@ -407,6 +407,7 @@ public class NetworkSession {
 
     private CompletionStage<BoltConnectionWithCloseTracking> acquireConnection(AccessMode mode) {
         var currentConnectionStage = connectionStage;
+        var databaseRef = new AtomicReference<DatabaseName>();
 
         var newConnectionStage = resultCursorStage
                 .thenCompose(cursor -> {
@@ -462,9 +463,7 @@ public class NetworkSession {
                                     connectionContext.impersonatedUser(),
                                     minVersion.get(),
                                     driverNotificationConfig,
-                                    (name) -> connectionContext
-                                            .databaseNameFuture()
-                                            .complete(name == null ? DatabaseNameUtil.defaultDatabase() : name))
+                                    databaseRef::set)
                             .thenApply(connection -> (DriverBoltConnection) new BoltConnectionWithAuthTokenManager(
                                     connection,
                                     overrideAuthToken != null
@@ -482,6 +481,13 @@ public class NetworkSession {
                                             }
                                             : authTokenManager))
                             .thenApply(BoltConnectionWithCloseTracking::new)
+                            .thenApply(connection -> {
+                                var name = databaseRef.get();
+                                connectionContext
+                                        .databaseNameFuture()
+                                        .complete(name == null ? DatabaseNameUtil.defaultDatabase() : name);
+                                return connection;
+                            })
                             .exceptionally(throwable -> {
                                 throwable = Futures.completionExceptionCause(throwable);
                                 if (throwable instanceof TimeoutException) {
