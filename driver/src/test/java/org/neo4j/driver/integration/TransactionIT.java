@@ -422,7 +422,7 @@ class TransactionIT {
                     result.list();
                 }
             });
-            assertEquals(terminationException, exception);
+            assertEquals(terminationException, exception.getCause());
         }
         tx.close();
     }
@@ -441,8 +441,8 @@ class TransactionIT {
 
         // Then
         for (var result : List.of(result0, result1)) {
-            var exception = assertThrows(ClientException.class, result::consume);
-            assertEquals(terminationException, exception);
+            var exception = assertThrows(TransactionTerminatedException.class, result::consume);
+            assertEquals(terminationException, exception.getCause());
         }
         tx.close();
     }

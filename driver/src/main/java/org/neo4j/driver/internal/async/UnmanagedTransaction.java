@@ -320,7 +320,10 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
 
     @Override
     public <T> T execute(Function<Throwable, T> causeOfTerminationConsumer) {
-        return executeWithLock(lock, () -> causeOfTerminationConsumer.apply(causeOfTermination));
+        return executeWithLock(lock, () -> {
+            var throwable = causeOfTermination == null ? null : failedTxException(causeOfTermination);
+            return causeOfTerminationConsumer.apply(throwable);
+        });
     }
 
     private void ensureCanRunQueries() {
@@ -347,15 +350,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                 if (causeOfTermination instanceof TransactionTerminatedException transactionTerminatedException) {
                     throw transactionTerminatedException;
                 } else {
-                    var message =
-                            "Cannot run more queries in this transaction, it has either experienced an fatal error or was explicitly terminated";
-                    throw new TransactionTerminatedException(
-                            GqlStatusError.UNKNOWN.getStatus(),
-                            GqlStatusError.UNKNOWN.getStatusDescription(message),
-                            "N/A",
-                            message,
-                            GqlStatusError.DIAGNOSTIC_RECORD,
-                            causeOfTermination);
+                    throw failedTxException(causeOfTermination);
                 }
             } else if (commitFuture != null) {
                 var message = "Cannot run more queries in this transaction, it is being committed";
@@ -576,6 +571,18 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         }
 
         return stage;
+    }
+
+    private static TransactionTerminatedException failedTxException(Throwable cause) {
+        var message =
+                "Cannot run more queries in this transaction, it has either experienced a fatal error or was explicitly terminated";
+        return new TransactionTerminatedException(
+                GqlStatusError.UNKNOWN.getStatus(),
+                GqlStatusError.UNKNOWN.getStatusDescription(message),
+                "N/A",
+                message,
+                GqlStatusError.DIAGNOSTIC_RECORD,
+                cause);
     }
 
     private static class BeginResponseHandler implements DriverResponseHandler {
