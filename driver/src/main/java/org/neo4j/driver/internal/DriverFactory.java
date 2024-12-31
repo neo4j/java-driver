@@ -53,6 +53,8 @@ import org.neo4j.driver.internal.bolt.basicimpl.NettyBoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.pooledimpl.PooledBoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutedBoltConnectionProvider;
+import org.neo4j.driver.internal.boltlistener.BoltConnectionListener;
+import org.neo4j.driver.internal.homedb.HomeDatabaseCache;
 import org.neo4j.driver.internal.metrics.DevNullMetricsProvider;
 import org.neo4j.driver.internal.metrics.InternalMetricsProvider;
 import org.neo4j.driver.internal.metrics.MetricsProvider;
@@ -164,8 +166,10 @@ public class DriverFactory {
             Supplier<Rediscovery> rediscoverySupplier) {
         DriverBoltConnectionProvider boltConnectionProvider = null;
         try {
-            boltConnectionProvider =
-                    createBoltConnectionProvider(uri, config, eventLoopGroup, routingSettings, rediscoverySupplier);
+            var homeDatabaseCache =
+                    HomeDatabaseCache.newInstance(uri.getScheme().startsWith("neo4j"));
+            boltConnectionProvider = createBoltConnectionProvider(
+                    uri, config, eventLoopGroup, routingSettings, rediscoverySupplier, homeDatabaseCache);
             boltConnectionProvider.init(
                     new BoltServerAddress(address.host(), address.port()),
                     new RoutingContext(uri),
@@ -174,7 +178,12 @@ public class DriverFactory {
                     config.connectionTimeoutMillis(),
                     metricsProvider.metricsListener());
             var sessionFactory = createSessionFactory(
-                    securityPlanManager, boltConnectionProvider, retryLogic, config, authTokenManager);
+                    securityPlanManager,
+                    boltConnectionProvider,
+                    retryLogic,
+                    config,
+                    authTokenManager,
+                    homeDatabaseCache);
             Supplier<CompletionStage<Void>> shutdownSupplier = ownsEventLoopGroup
                     ? () -> {
                         var closeFuture = new CompletableFuture<Void>();
@@ -213,12 +222,14 @@ public class DriverFactory {
             Config config,
             EventLoopGroup eventLoopGroup,
             RoutingSettings routingSettings,
-            Supplier<Rediscovery> rediscoverySupplier) {
+            Supplier<Rediscovery> rediscoverySupplier,
+            BoltConnectionListener boltConnectionListener) {
         DriverBoltConnectionProvider boltConnectionProvider;
         var clock = createClock();
         var loggingProvider = new BoltLoggingProvider(config.logging());
         Supplier<BoltConnectionProvider> pooledBoltConnectionProviderSupplier =
-                () -> createPooledBoltConnectionProvider(config, eventLoopGroup, clock, loggingProvider);
+                () -> createPooledBoltConnectionProvider(
+                        config, eventLoopGroup, clock, loggingProvider, boltConnectionListener);
         var errorMapper = ErrorMapper.getInstance();
         if (uri.getScheme().startsWith("bolt")) {
             assertNoRoutingContext(uri, routingSettings);
@@ -260,8 +271,14 @@ public class DriverFactory {
     }
 
     private BoltConnectionProvider createPooledBoltConnectionProvider(
-            Config config, EventLoopGroup eventLoopGroup, Clock clock, LoggingProvider loggingProvider) {
+            Config config,
+            EventLoopGroup eventLoopGroup,
+            Clock clock,
+            LoggingProvider loggingProvider,
+            BoltConnectionListener boltConnectionListener) {
         var nettyBoltConnectionProvider = createNettyBoltConnectionProvider(eventLoopGroup, clock, loggingProvider);
+        nettyBoltConnectionProvider = BoltConnectionListener.listeningBoltConnectionProvider(
+                nettyBoltConnectionProvider, boltConnectionListener);
         return new PooledBoltConnectionProvider(
                 nettyBoltConnectionProvider,
                 config.maxConnectionPoolSize(),
@@ -326,8 +343,10 @@ public class DriverFactory {
             DriverBoltConnectionProvider connectionProvider,
             RetryLogic retryLogic,
             Config config,
-            AuthTokenManager authTokenManager) {
-        return new SessionFactoryImpl(securityPlanManager, connectionProvider, retryLogic, config, authTokenManager);
+            AuthTokenManager authTokenManager,
+            HomeDatabaseCache homeDatabaseCache) {
+        return new SessionFactoryImpl(
+                securityPlanManager, connectionProvider, retryLogic, config, authTokenManager, homeDatabaseCache);
     }
 
     /**

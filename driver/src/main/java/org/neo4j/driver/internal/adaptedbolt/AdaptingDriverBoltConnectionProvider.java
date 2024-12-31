@@ -74,7 +74,8 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
             String impersonatedUser,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer) {
+            Consumer<DatabaseName> databaseNameConsumer,
+            Map<String, Object> additionalParameters) {
         return delegate.connect(
                         securityPlan,
                         databaseName,
@@ -84,7 +85,8 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
                         impersonatedUser,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        additionalParameters)
                 .exceptionally(errorMapper::mapAndTrow)
                 .thenApply(boltConnection -> new AdaptingDriverBoltConnection(
                         boltConnection,

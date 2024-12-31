@@ -43,4 +43,6 @@ public interface RoutingTableHandler extends RoutingErrorHandler {
     CompletionStage<RoutingTable> updateRoutingTable(ClusterCompositionLookupResult compositionLookupResult);
 
     RoutingTable routingTable();
+
+    boolean staleRoutingTable(AccessMode mode);
 }

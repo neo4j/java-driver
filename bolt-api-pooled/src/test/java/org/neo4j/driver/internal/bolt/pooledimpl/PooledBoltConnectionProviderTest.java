@@ -138,6 +138,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
 
@@ -151,7 +152,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join();
 
@@ -169,6 +171,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any());
         assertEquals(1, provider.inUse());
         assertEquals(1, provider.size());
@@ -187,6 +190,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider = new PooledBoltConnectionProvider(
@@ -201,7 +205,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join();
 
@@ -215,7 +220,8 @@ class PooledBoltConnectionProviderTest {
                 null,
                 minVersion,
                 notificationConfig,
-                databaseNameConsumer);
+                databaseNameConsumer,
+                Collections.emptyMap());
 
         // then
         var completionException = assertThrows(
@@ -243,6 +249,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         var connection = provider.connect(
@@ -254,7 +261,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join();
 
@@ -291,6 +299,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
@@ -302,7 +311,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join()
                 .close()
@@ -320,7 +330,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join();
 
@@ -354,6 +365,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
@@ -365,7 +377,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join()
                 .close()
@@ -399,6 +412,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(null),
                         eq(null),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
 
@@ -419,6 +433,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(null),
                         eq(null),
+                        any(),
                         any());
         then(connection).should().reset();
         then(connection).should().flush(any());
@@ -445,6 +460,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(null),
                         eq(null),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
 
@@ -466,6 +482,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(null),
                         eq(null),
+                        any(),
                         any());
         then(connection).should().reset();
         then(connection).should().flush(any());
@@ -498,6 +515,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(null),
                         eq(null),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
 
@@ -519,6 +537,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(null),
                         eq(null),
+                        any(),
                         any());
         then(connection).should().reset();
         then(connection).should().flush(any());
@@ -551,6 +570,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
@@ -562,7 +582,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join()
                 .close()
@@ -579,7 +600,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         new BoltProtocolVersion(5, 5),
                         NotificationConfig.defaultConfig(),
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture();
 
         // then
@@ -609,6 +631,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection))
                 .willReturn(CompletableFuture.completedStage(connection2));
@@ -621,7 +644,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join()
                 .close()
@@ -639,7 +663,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         NotificationConfig.defaultConfig(),
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join();
 
@@ -675,6 +700,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
@@ -686,7 +712,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join()
                 .close()
@@ -704,7 +731,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         NotificationConfig.defaultConfig(),
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join();
 
@@ -745,6 +773,7 @@ class PooledBoltConnectionProviderTest {
                         eq(null),
                         eq(minVersion),
                         eq(notificationConfig),
+                        any(),
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
@@ -756,7 +785,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         notificationConfig,
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join()
                 .close()
@@ -773,7 +803,8 @@ class PooledBoltConnectionProviderTest {
                         null,
                         minVersion,
                         NotificationConfig.defaultConfig(),
-                        databaseNameConsumer)
+                        databaseNameConsumer,
+                        Collections.emptyMap())
                 .toCompletableFuture()
                 .join();
 

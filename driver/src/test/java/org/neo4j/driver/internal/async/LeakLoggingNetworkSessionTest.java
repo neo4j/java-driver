@@ -145,12 +145,13 @@ class LeakLoggingNetworkSessionTest {
                 NotificationConfig.defaultConfig(),
                 null,
                 true,
-                AuthTokenManagers.basic(AuthTokens::none));
+                AuthTokenManagers.basic(AuthTokens::none),
+                mock());
     }
 
     private static DriverBoltConnectionProvider connectionProviderMock(DriverBoltConnection connection) {
         var provider = mock(DriverBoltConnectionProvider.class);
-        when(provider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(provider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(CompletableFuture.completedFuture(connection));
         return provider;
     }

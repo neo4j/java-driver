@@ -45,8 +45,8 @@ public final class ChannelAttributes {
 
     // configuration hints provided by the server
     private static final AttributeKey<Long> CONNECTION_READ_TIMEOUT = newInstance("connectionReadTimeout");
-
     private static final AttributeKey<Boolean> TELEMETRY_ENABLED = newInstance("telemetryEnabled");
+    private static final AttributeKey<Boolean> SSR_ENABLED = newInstance("ssr.enabled");
 
     private ChannelAttributes() {}
 
@@ -151,6 +151,14 @@ public final class ChannelAttributes {
 
     public static boolean telemetryEnabled(Channel channel) {
         return Optional.ofNullable(get(channel, TELEMETRY_ENABLED)).orElse(false);
+    }
+
+    public static void setSsrEnabled(Channel channel, Boolean telemetryEnabled) {
+        setOnce(channel, SSR_ENABLED, telemetryEnabled);
+    }
+
+    public static boolean ssrEnabled(Channel channel) {
+        return Optional.ofNullable(get(channel, SSR_ENABLED)).orElse(false);
     }
 
     private static <T> T get(Channel channel, AttributeKey<T> key) {

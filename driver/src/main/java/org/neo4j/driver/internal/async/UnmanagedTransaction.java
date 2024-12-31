@@ -25,6 +25,7 @@ import static org.neo4j.driver.internal.util.LockUtil.executeWithLock;
 
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -117,6 +118,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     private final String impersonatedUser;
 
     private final ApiTelemetryWork apiTelemetryWork;
+    private final Consumer<String> databaseNameConsumer;
 
     public UnmanagedTransaction(
             DriverBoltConnection connection,
@@ -127,6 +129,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
             long fetchSize,
             NotificationConfig notificationConfig,
             ApiTelemetryWork apiTelemetryWork,
+            Consumer<String> databaseNameConsumer,
             Logging logging) {
         this(
                 connection,
@@ -138,6 +141,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                 new ResultCursorsHolder(),
                 notificationConfig,
                 apiTelemetryWork,
+                databaseNameConsumer,
                 logging);
     }
 
@@ -151,6 +155,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
             ResultCursorsHolder resultCursors,
             NotificationConfig notificationConfig,
             ApiTelemetryWork apiTelemetryWork,
+            Consumer<String> databaseNameConsumer,
             Logging logging) {
         this.logging = logging;
         this.connection = new TerminationAwareBoltConnection(logging, connection, this, this::markTerminated);
@@ -162,6 +167,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         this.fetchSize = fetchSize;
         this.notificationConfig = notificationConfig;
         this.apiTelemetryWork = apiTelemetryWork;
+        this.databaseNameConsumer = Objects.requireNonNull(databaseNameConsumer);
     }
 
     // flush = false is only supported for async mode with a single subsequent run
@@ -184,7 +190,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
                         notificationConfig))
                 .thenCompose(connection -> {
                     if (flush) {
-                        var responseHandler = new BeginResponseHandler(apiTelemetryWork);
+                        var responseHandler = new BeginResponseHandler(apiTelemetryWork, databaseNameConsumer);
                         connection
                                 .flush(responseHandler)
                                 .thenCompose(ignored -> responseHandler.summaryFuture)
@@ -227,7 +233,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         ensureCanRunQueries();
         var parameters = query.parameters().asMap(Values::value);
         var resultCursor = new ResultCursorImpl(
-                connection, query, fetchSize, (bookmark) -> {}, false, beginFuture, apiTelemetryWork);
+                connection, query, fetchSize, (bookmark) -> {}, false, beginFuture, ignored -> {}, apiTelemetryWork);
         var flushStage = connection
                 .run(query.text(), parameters)
                 .thenCompose(ignored -> connection.pull(-1, fetchSize))
@@ -588,12 +594,14 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
     private static class BeginResponseHandler implements DriverResponseHandler {
         final CompletableFuture<UnmanagedTransaction> summaryFuture = new CompletableFuture<>();
         private final ApiTelemetryWork apiTelemetryWork;
+        private final Consumer<String> databaseNameConsumer;
         private Throwable error;
         private BeginSummary beginSummary;
         private int ignoredCount;
 
-        private BeginResponseHandler(ApiTelemetryWork apiTelemetryWork) {
+        private BeginResponseHandler(ApiTelemetryWork apiTelemetryWork, Consumer<String> databaseNameConsumer) {
             this.apiTelemetryWork = apiTelemetryWork;
+            this.databaseNameConsumer = Objects.requireNonNull(databaseNameConsumer);
         }
 
         @Override
@@ -612,6 +620,7 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         @Override
         public void onBeginSummary(BeginSummary summary) {
             beginSummary = summary;
+            summary.databaseName().ifPresent(databaseNameConsumer);
         }
 
         @Override

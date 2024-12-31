@@ -103,7 +103,16 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
             Set<String> rediscoveryBookmarks,
             String impersonatedUser,
             Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
-            BoltProtocolVersion minVersion) {
+            BoltProtocolVersion minVersion,
+            String homeDatabaseHint) {
+        if (!databaseNameFuture.isDone()) {
+            if (homeDatabaseHint != null) {
+                var handler = routingTableHandlers.get(DatabaseNameUtil.database(homeDatabaseHint));
+                if (handler != null && !handler.staleRoutingTable(mode)) {
+                    return CompletableFuture.completedFuture(handler);
+                }
+            }
+        }
         return ensureDatabaseNameIsCompleted(
                         securityPlan,
                         databaseNameFuture,

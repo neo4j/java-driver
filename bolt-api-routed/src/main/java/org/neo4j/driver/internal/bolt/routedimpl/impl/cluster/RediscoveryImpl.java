@@ -23,6 +23,7 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 
 import java.net.UnknownHostException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -368,7 +369,8 @@ public class RediscoveryImpl implements Rediscovery {
                                 null,
                                 minVersion,
                                 null,
-                                (ignored) -> {}))
+                                (ignored) -> {},
+                                Collections.emptyMap()))
                 .thenApply(connection -> {
                     connectionRef.set(connection);
                     return connection;

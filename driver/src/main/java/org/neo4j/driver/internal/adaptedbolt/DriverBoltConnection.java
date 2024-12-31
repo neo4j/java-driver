@@ -100,4 +100,6 @@ public interface DriverBoltConnection {
     BoltProtocolVersion protocolVersion();
 
     boolean telemetrySupported();
+
+    boolean serverSideRoutingEnabled();
 }

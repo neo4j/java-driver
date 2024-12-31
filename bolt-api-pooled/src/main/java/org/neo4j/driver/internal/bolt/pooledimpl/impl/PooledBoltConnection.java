@@ -345,6 +345,11 @@ public class PooledBoltConnection implements BoltConnection {
         return delegate.telemetrySupported();
     }
 
+    @Override
+    public boolean serverSideRoutingEnabled() {
+        return delegate.serverSideRoutingEnabled();
+    }
+
     // internal use only
     public BoltConnection delegate() {
         return delegate;

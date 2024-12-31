@@ -194,4 +194,9 @@ public abstract class DelegatingBoltConnection implements DriverBoltConnection {
     public boolean telemetrySupported() {
         return delegate.telemetrySupported();
     }
+
+    @Override
+    public boolean serverSideRoutingEnabled() {
+        return delegate.serverSideRoutingEnabled();
+    }
 }

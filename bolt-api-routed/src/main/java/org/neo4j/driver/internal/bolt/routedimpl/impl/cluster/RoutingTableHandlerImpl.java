@@ -208,4 +208,12 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
     public RoutingTable routingTable() {
         return routingTable;
     }
+
+    @Override
+    public synchronized boolean staleRoutingTable(AccessMode mode) {
+        if (refreshRoutingTableFuture != null) {
+            return true;
+        }
+        return routingTable.isStaleFor(mode);
+    }
 }

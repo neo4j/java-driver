@@ -90,4 +90,6 @@ public interface BoltConnection {
     BoltProtocolVersion protocolVersion();
 
     boolean telemetrySupported();
+
+    boolean serverSideRoutingEnabled();
 }

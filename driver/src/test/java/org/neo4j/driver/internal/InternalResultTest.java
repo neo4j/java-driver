@@ -345,7 +345,7 @@ class InternalResultTest {
         when(connection.protocolVersion()).thenReturn(new BoltProtocolVersion(4, 3));
         when(connection.serverAgent()).thenReturn("Neo4j/4.2.5");
 
-        var resultCursor = new ResultCursorImpl(connection, query, -1, ignored -> {}, false, null, null);
+        var resultCursor = new ResultCursorImpl(connection, query, -1, ignored -> {}, false, null, ignored -> {}, null);
         var runSummary = mock(RunSummary.class);
         given(runSummary.keys()).willReturn(asList("k1", "k2"));
         resultCursor.onRunSummary(runSummary);
