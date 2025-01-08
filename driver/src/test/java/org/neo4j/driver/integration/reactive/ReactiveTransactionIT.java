@@ -63,7 +63,7 @@ class ReactiveTransactionIT {
         for (var result : List.of(result0, result1)) {
             var exception = assertThrows(
                     ClientException.class, () -> Flux.from(result.records()).blockFirst());
-            assertEquals(terminationException, exception);
+            assertEquals(terminationException, exception.getCause());
         }
         Mono.fromDirect(tx.close()).block();
     }
@@ -92,7 +92,7 @@ class ReactiveTransactionIT {
         for (var result : List.of(result0, result1)) {
             var exception = assertThrows(ClientException.class, () -> Mono.fromDirect(result.consume())
                     .block());
-            assertEquals(terminationException, exception);
+            assertEquals(terminationException, exception.getCause());
         }
         Mono.fromDirect(tx.close()).block();
     }
