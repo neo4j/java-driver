@@ -68,6 +68,7 @@ import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.exceptions.ConnectionReadTimeoutException;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.exceptions.SessionExpiredException;
+import org.neo4j.driver.exceptions.TransactionTerminatedException;
 import org.neo4j.driver.exceptions.TransientException;
 import org.neo4j.driver.internal.util.ImmediateSchedulingEventExecutor;
 import org.reactivestreams.Publisher;
@@ -1300,7 +1301,7 @@ class ExponentialBackoffRetryLogicTest {
     }
 
     private static RuntimeException clientExceptionWithValidTerminationCause() {
-        return new ClientException("¯\\_(ツ)_/¯", serviceUnavailable());
+        return new TransactionTerminatedException("¯\\_(ツ)_/¯", serviceUnavailable());
     }
 
     private static RuntimeException randomClientException() {

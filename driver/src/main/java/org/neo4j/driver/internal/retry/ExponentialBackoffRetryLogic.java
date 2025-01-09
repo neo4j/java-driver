@@ -30,10 +30,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.neo4j.driver.Logger;
 import org.neo4j.driver.Logging;
-import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.exceptions.RetryableException;
-import org.neo4j.driver.exceptions.SecurityRetryableException;
+import org.neo4j.driver.exceptions.TransactionTerminatedException;
 import org.neo4j.driver.internal.util.Futures;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -161,10 +160,7 @@ public class ExponentialBackoffRetryLogic implements RetryLogic {
      * @return the possible cause or the original error
      */
     private static Throwable extractPossibleTerminationCause(Throwable error) {
-        // Having a dedicated "TerminatedException" inheriting from ClientException might be a good idea.
-        if (!(error instanceof SecurityRetryableException)
-                && error instanceof ClientException
-                && error.getCause() != null) {
+        if (error instanceof TransactionTerminatedException && error.getCause() != null) {
             return error.getCause();
         }
         return error;
