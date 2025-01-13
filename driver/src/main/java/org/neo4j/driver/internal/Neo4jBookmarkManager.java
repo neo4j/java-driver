@@ -58,7 +58,7 @@ public final class Neo4jBookmarkManager implements BookmarkManager {
         var immutableBookmarks = executeWithLock(rwLock.writeLock(), () -> {
             this.bookmarks.removeAll(previousBookmarks);
             this.bookmarks.addAll(newBookmarks);
-            return Collections.unmodifiableSet(this.bookmarks);
+            return Collections.unmodifiableSet(new HashSet<>(this.bookmarks));
         });
         if (updateListener != null) {
             updateListener.accept(immutableBookmarks);
@@ -67,12 +67,10 @@ public final class Neo4jBookmarkManager implements BookmarkManager {
 
     @Override
     public Set<Bookmark> getBookmarks() {
-        var immutableBookmarks = executeWithLock(rwLock.readLock(), () -> Collections.unmodifiableSet(this.bookmarks));
+        var bookmarks = executeWithLock(rwLock.readLock(), () -> new HashSet<>(this.bookmarks));
         if (bookmarksSupplier != null) {
-            var bookmarks = new HashSet<>(immutableBookmarks);
             bookmarks.addAll(bookmarksSupplier.get());
-            immutableBookmarks = Collections.unmodifiableSet(bookmarks);
         }
-        return immutableBookmarks;
+        return Collections.unmodifiableSet(bookmarks);
     }
 }
