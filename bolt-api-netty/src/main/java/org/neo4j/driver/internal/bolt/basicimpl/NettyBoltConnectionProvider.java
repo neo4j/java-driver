@@ -116,7 +116,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             String impersonatedUser,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer) {
+            Consumer<DatabaseName> databaseNameConsumer,
+            Map<String, Object> additionalParameters) {
         synchronized (this) {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
@@ -189,7 +190,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         null,
                         null,
                         null,
-                        (ignored) -> {})
+                        (ignored) -> {},
+                        Collections.emptyMap())
                 .thenCompose(BoltConnection::close);
     }
 
@@ -204,7 +206,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         null,
                         null,
                         null,
-                        (ignored) -> {})
+                        (ignored) -> {},
+                        Collections.emptyMap())
                 .thenCompose(boltConnection -> {
                     var supports = boltConnection.protocolVersion().compareTo(BoltProtocolV4.VERSION) >= 0;
                     return boltConnection.close().thenApply(ignored -> supports);
@@ -222,7 +225,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         null,
                         null,
                         null,
-                        (ignored) -> {})
+                        (ignored) -> {},
+                        Collections.emptyMap())
                 .thenCompose(boltConnection -> {
                     var supports = BoltProtocolV51.VERSION.compareTo(boltConnection.protocolVersion()) <= 0;
                     return boltConnection.close().thenApply(ignored -> supports);

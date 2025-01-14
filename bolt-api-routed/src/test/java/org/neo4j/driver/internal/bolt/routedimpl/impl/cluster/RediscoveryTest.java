@@ -676,7 +676,7 @@ class RediscoveryTest {
         given(domainNameResolver.resolve(initialRouter.host())).willReturn(new InetAddress[] {address});
         var table = routingTableMock(true);
         var pool = mock(BoltConnectionProvider.class);
-        given(pool.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(pool.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(failedFuture(new BoltServiceUnavailableException("not available")));
         var logging = mock(LoggingProvider.class);
         var logger = mock(System.Logger.class);
@@ -722,7 +722,7 @@ class RediscoveryTest {
             var boltConnection = setupConnection(entry.getValue());
 
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
-            given(boltConnectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            given(boltConnectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                     .willReturn(completedFuture(boltConnection));
 
             addressToProvider.put(entry.getKey(), boltConnectionProvider);

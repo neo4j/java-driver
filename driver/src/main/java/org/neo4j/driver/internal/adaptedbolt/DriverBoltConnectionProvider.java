@@ -51,7 +51,8 @@ public interface DriverBoltConnectionProvider {
             String impersonatedUser,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer);
+            Consumer<DatabaseName> databaseNameConsumer,
+            Map<String, Object> additionalParameters);
 
     CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap);
 

@@ -75,6 +75,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
     private final CompletableFuture<UnmanagedTransaction> beginFuture;
     private final ApiTelemetryWork apiTelemetryWork;
     private final CompletableFuture<Void> consumedFuture = new CompletableFuture<>();
+    private final Consumer<String> databaseNameConsumer;
     private RunSummary runSummary;
     private State state;
 
@@ -104,6 +105,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
             Consumer<DatabaseBookmark> bookmarkConsumer,
             boolean closeOnSummary,
             CompletableFuture<UnmanagedTransaction> beginFuture,
+            Consumer<String> databaseNameConsumer,
             ApiTelemetryWork apiTelemetryWork) {
         this.boltConnection = Objects.requireNonNull(boltConnection);
         this.legacyNotifications = new BoltProtocolVersion(5, 5).compareTo(boltConnection.protocolVersion()) > 0;
@@ -115,6 +117,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         this.state = State.STREAMING;
         this.beginFuture = beginFuture;
         this.apiTelemetryWork = apiTelemetryWork;
+        this.databaseNameConsumer = Objects.requireNonNull(databaseNameConsumer);
     }
 
     public CompletionStage<ResultCursorImpl> resultCursor() {
@@ -577,6 +580,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
     @Override
     public void onBeginSummary(BeginSummary summary) {
         if (beginFuture != null) {
+            summary.databaseName().ifPresent(databaseNameConsumer);
             beginFuture.complete(null);
         }
     }
@@ -586,6 +590,7 @@ public class ResultCursorImpl extends AbstractRecordStateResponseHandler
         synchronized (this) {
             runSummary = summary;
         }
+        summary.databaseName().ifPresent(databaseNameConsumer);
         resultCursorFuture.complete(this);
     }
 

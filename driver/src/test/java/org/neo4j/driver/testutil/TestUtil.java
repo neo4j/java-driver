@@ -225,7 +225,8 @@ public final class TestUtil {
                 Config.defaultConfig().notificationConfig(),
                 null,
                 telemetryDisabled,
-                mock(AuthTokenManager.class));
+                mock(AuthTokenManager.class),
+                mock());
     }
 
     public static void setupConnectionAnswers(

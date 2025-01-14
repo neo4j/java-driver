@@ -91,7 +91,7 @@ class NetworkSessionTest {
         given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.close()).willReturn(completedFuture(null));
         connectionProvider = mock(DriverBoltConnectionProvider.class);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var database = (DatabaseName) invocation.getArguments()[1];
                     @SuppressWarnings("unchecked")
@@ -241,7 +241,7 @@ class NetworkSessionTest {
 
         run(session, query);
 
-        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -259,7 +259,8 @@ class NetworkSessionTest {
     void resetDoesNothingWhenNoTransactionAndNoConnection() {
         await(session.resetAsync());
 
-        verify(connectionProvider, never()).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider, never())
+                .connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -268,7 +269,8 @@ class NetworkSessionTest {
 
         close(session);
 
-        verify(connectionProvider, never()).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider, never())
+                .connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -277,7 +279,7 @@ class NetworkSessionTest {
         var tx = beginTransaction(session);
 
         assertNotNull(tx);
-        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -334,7 +336,7 @@ class NetworkSessionTest {
                             handler.onComplete();
                         }));
         var tx = beginTransaction(session);
-        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         then(connection).should().flush(any());
         var query = "RETURN 42";
         await(tx.runAsync(new Query(query)));
@@ -419,7 +421,8 @@ class NetworkSessionTest {
         var session2 = newSession(connectionProvider, mode);
         beginTransaction(session2);
         var argument = ArgumentCaptor.forClass(org.neo4j.driver.internal.bolt.api.AccessMode.class);
-        verify(connectionProvider).connect(any(), any(), any(), argument.capture(), any(), any(), any(), any(), any());
+        verify(connectionProvider)
+                .connect(any(), any(), any(), argument.capture(), any(), any(), any(), any(), any(), any());
         assertEquals(
                 switch (mode) {
                     case READ -> org.neo4j.driver.internal.bolt.api.AccessMode.READ;
@@ -446,7 +449,7 @@ class NetworkSessionTest {
     void shouldDoNothingWhenClosingWithoutAcquiredConnection() {
         var error = new RuntimeException("Hi");
         Mockito.reset(connectionProvider);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(failedFuture(error));
 
         var e = assertThrows(Exception.class, () -> run(session, "RETURN 1"));
@@ -459,7 +462,7 @@ class NetworkSessionTest {
     void shouldRunAfterRunFailure() {
         var error = new RuntimeException("Hi");
         Mockito.reset(connectionProvider);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(failedFuture(error))
                 .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var databaseName = (DatabaseName) invocation.getArguments()[1];
@@ -479,7 +482,8 @@ class NetworkSessionTest {
 
         run(session, query);
 
-        verify(connectionProvider, times(2)).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider, times(2))
+                .connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verifyAutocommitRunAndPull(connection, query);
     }
 
@@ -494,7 +498,7 @@ class NetworkSessionTest {
         given(connection2.close()).willReturn(CompletableFuture.completedStage(null));
 
         Mockito.reset(connectionProvider);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var databaseName = (DatabaseName) invocation.getArguments()[1];
                     @SuppressWarnings("unchecked")
@@ -522,7 +526,8 @@ class NetworkSessionTest {
 
         run(session, query);
 
-        verify(connectionProvider, times(2)).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider, times(2))
+                .connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         then(connection1).should().beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any());
         verifyAutocommitRunAndPull(connection2, "RETURN 2");
     }
@@ -544,7 +549,7 @@ class NetworkSessionTest {
         }));
 
         Mockito.reset(connectionProvider);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var databaseName = (DatabaseName) invocation.getArguments()[1];
                     @SuppressWarnings("unchecked")
@@ -570,7 +575,8 @@ class NetworkSessionTest {
 
         beginTransaction(session);
 
-        verify(connectionProvider, times(2)).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider, times(2))
+                .connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         then(connection1).should().beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any());
         then(connection2).should().beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
@@ -579,7 +585,7 @@ class NetworkSessionTest {
     void shouldBeginTxAfterRunFailureToAcquireConnection() {
         var error = new RuntimeException("Hi");
         Mockito.reset(connectionProvider);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(failedFuture(error))
                 .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var databaseName = (DatabaseName) invocation.getArguments()[1];
@@ -596,7 +602,8 @@ class NetworkSessionTest {
 
         beginTransaction(session);
 
-        verify(connectionProvider, times(2)).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider, times(2))
+                .connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         then(connection).should().beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 

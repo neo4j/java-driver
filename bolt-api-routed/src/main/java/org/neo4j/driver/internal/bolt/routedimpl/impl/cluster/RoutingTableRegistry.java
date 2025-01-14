@@ -46,7 +46,8 @@ public interface RoutingTableRegistry {
             Set<String> rediscoveryBookmarks,
             String impersonatedUser,
             Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
-            BoltProtocolVersion minVersion);
+            BoltProtocolVersion minVersion,
+            String homeDatabaseHint);
 
     /**
      * @return all servers in the registry

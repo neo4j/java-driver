@@ -75,7 +75,7 @@ class InternalAsyncTransactionTest {
         connection = connectionMock(new BoltProtocolVersion(4, 0));
         given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         var connectionProvider = mock(DriverBoltConnectionProvider.class);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var database = (DatabaseName) invocation.getArguments()[1];
                     @SuppressWarnings("unchecked")

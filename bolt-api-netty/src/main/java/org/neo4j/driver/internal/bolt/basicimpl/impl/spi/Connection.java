@@ -35,6 +35,8 @@ public interface Connection {
 
     boolean isTelemetryEnabled();
 
+    boolean isSsrEnabled();
+
     String serverAgent();
 
     BoltServerAddress serverAddress();

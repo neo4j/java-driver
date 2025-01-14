@@ -18,6 +18,7 @@ package org.neo4j.driver.internal.bolt.basicimpl.impl.handlers;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.bolt.api.values.Value;
@@ -38,8 +39,10 @@ public class RunResponseHandler implements ResponseHandler {
         var queryKeys = metadataExtractor.extractQueryKeys(metadata);
         var resultAvailableAfter = metadataExtractor.extractResultAvailableAfter(metadata);
         var queryId = metadataExtractor.extractQueryId(metadata);
+        var db = metadata.get("db");
+        var databaseName = db != null ? db.asString() : null;
 
-        runFuture.complete(new RunResponseImpl(queryId, queryKeys, resultAvailableAfter));
+        runFuture.complete(new RunResponseImpl(queryId, queryKeys, resultAvailableAfter, databaseName));
     }
 
     @Override
@@ -52,5 +55,11 @@ public class RunResponseHandler implements ResponseHandler {
         throw new UnsupportedOperationException();
     }
 
-    private record RunResponseImpl(long queryId, List<String> keys, long resultAvailableAfter) implements RunSummary {}
+    private record RunResponseImpl(long queryId, List<String> keys, long resultAvailableAfter, String database)
+            implements RunSummary {
+        @Override
+        public Optional<String> databaseName() {
+            return Optional.ofNullable(database);
+        }
+    }
 }

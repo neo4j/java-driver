@@ -52,6 +52,7 @@ import org.mockito.stubbing.Answer;
 import org.neo4j.bolt.api.test.values.TestValueFactory;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
+import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.api.values.ValueFactory;
@@ -159,7 +160,7 @@ public class BoltProtocolV51Test {
             return expectedStage;
         });
         @SuppressWarnings("unchecked")
-        var handler = (MessageHandler<Void>) mock(MessageHandler.class);
+        var handler = (MessageHandler<BeginSummary>) mock(MessageHandler.class);
 
         var stage = protocol.beginTransaction(
                 connection,
@@ -203,7 +204,7 @@ public class BoltProtocolV51Test {
             return expectedStage;
         });
         @SuppressWarnings("unchecked")
-        var handler = (MessageHandler<Void>) mock(MessageHandler.class);
+        var handler = (MessageHandler<BeginSummary>) mock(MessageHandler.class);
         var bookmarks = Collections.singleton("neo4j:bookmark:v1:tx100");
 
         var stage = protocol.beginTransaction(
@@ -248,7 +249,7 @@ public class BoltProtocolV51Test {
             return expectedStage;
         });
         @SuppressWarnings("unchecked")
-        var handler = (MessageHandler<Void>) mock(MessageHandler.class);
+        var handler = (MessageHandler<BeginSummary>) mock(MessageHandler.class);
 
         var stage = protocol.beginTransaction(
                 connection,
@@ -292,7 +293,7 @@ public class BoltProtocolV51Test {
             return expectedStage;
         });
         @SuppressWarnings("unchecked")
-        var handler = (MessageHandler<Void>) mock(MessageHandler.class);
+        var handler = (MessageHandler<BeginSummary>) mock(MessageHandler.class);
         var bookmarks = Collections.singleton("neo4j:bookmark:v1:tx4242");
 
         var stage = protocol.beginTransaction(
@@ -748,7 +749,7 @@ public class BoltProtocolV51Test {
                 return expectedStage;
             });
             @SuppressWarnings("unchecked")
-            var handler = (MessageHandler<Void>) mock(MessageHandler.class);
+            var handler = (MessageHandler<BeginSummary>) mock(MessageHandler.class);
 
             var stage = protocol.beginTransaction(
                     connection,

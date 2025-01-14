@@ -21,6 +21,7 @@ import static org.neo4j.driver.internal.util.Futures.completedWithNull;
 import static org.neo4j.driver.internal.util.Futures.completionExceptionCause;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -30,7 +31,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -63,6 +63,7 @@ import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
+import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.TelemetryApi;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
@@ -70,6 +71,8 @@ import org.neo4j.driver.internal.cursor.DisposableResultCursorImpl;
 import org.neo4j.driver.internal.cursor.ResultCursorImpl;
 import org.neo4j.driver.internal.cursor.RxResultCursor;
 import org.neo4j.driver.internal.cursor.RxResultCursorImpl;
+import org.neo4j.driver.internal.homedb.HomeDatabaseCache;
+import org.neo4j.driver.internal.homedb.HomeDatabaseCacheKey;
 import org.neo4j.driver.internal.logging.PrefixedLogger;
 import org.neo4j.driver.internal.retry.RetryLogic;
 import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
@@ -78,6 +81,7 @@ import org.neo4j.driver.internal.telemetry.ApiTelemetryWork;
 import org.neo4j.driver.internal.util.Futures;
 
 public class NetworkSession {
+    private static final String HOME_DATABASE_KEY = "homeDatabase";
     private final BoltSecurityPlanManager securityPlanManager;
     private final DriverBoltConnectionProvider boltConnectionProvider;
     private final NetworkSessionConnectionContext connectionContext;
@@ -99,6 +103,8 @@ public class NetworkSession {
     private final NotificationConfig notificationConfig;
     private final boolean telemetryDisabled;
     private final AuthTokenManager authTokenManager;
+    private final HomeDatabaseCache homeDatabaseCache;
+    private final HomeDatabaseCacheKey homeDatabaseKey;
 
     public NetworkSession(
             BoltSecurityPlanManager securityPlanManager,
@@ -115,7 +121,8 @@ public class NetworkSession {
             org.neo4j.driver.NotificationConfig notificationConfig,
             AuthToken overrideAuthToken,
             boolean telemetryDisabled,
-            AuthTokenManager authTokenManager) {
+            AuthTokenManager authTokenManager,
+            HomeDatabaseCache homeDatabaseCache) {
         Objects.requireNonNull(bookmarks, "bookmarks may not be null");
         Objects.requireNonNull(bookmarkManager, "bookmarkManager may not be null");
         this.securityPlanManager = Objects.requireNonNull(securityPlanManager);
@@ -137,6 +144,8 @@ public class NetworkSession {
         this.notificationConfig = NotificationConfigMapper.map(notificationConfig);
         this.telemetryDisabled = telemetryDisabled;
         this.authTokenManager = authTokenManager;
+        this.homeDatabaseCache = Objects.requireNonNull(homeDatabaseCache);
+        this.homeDatabaseKey = HomeDatabaseCacheKey.of(overrideAuthToken, impersonatedUser);
     }
 
     public CompletionStage<ResultCursor> runAsync(Query query, TransactionConfig config) {
@@ -148,11 +157,18 @@ public class NetworkSession {
                     var apiTelemetryWork = new ApiTelemetryWork(TelemetryApi.AUTO_COMMIT_TRANSACTION);
                     apiTelemetryWork.setEnabled(!telemetryDisabled);
                     var resultCursor = new ResultCursorImpl(
-                            connection, query, fetchSize, this::handleNewBookmark, true, null, null);
+                            connection,
+                            query,
+                            fetchSize,
+                            this::handleNewBookmark,
+                            true,
+                            null,
+                            this::handleDatabaseName,
+                            null);
                     var cursorStage = apiTelemetryWork
                             .pipelineTelemetryIfEnabled(connection)
                             .thenCompose(conn -> conn.runInAutoCommitTransaction(
-                                    connectionContext.databaseNameFuture.getNow(null),
+                                    connectionContext.databaseNameFuture.getNow(DatabaseNameUtil.defaultDatabase()),
                                     asBoltAccessMode(mode),
                                     connectionContext.impersonatedUser,
                                     determineBookmarks(true).stream()
@@ -201,12 +217,12 @@ public class NetworkSession {
                     var apiTelemetryWork = new ApiTelemetryWork(TelemetryApi.AUTO_COMMIT_TRANSACTION);
                     apiTelemetryWork.setEnabled(!telemetryDisabled);
                     var runFailed = new AtomicBoolean(false);
-                    var responseHandler =
-                            new RunRxResponseHandler(logging, connection, query, this::handleNewBookmark, runFailed);
+                    var responseHandler = new RunRxResponseHandler(
+                            logging, connection, query, this::handleNewBookmark, runFailed, this::handleDatabaseName);
                     var cursorStage = apiTelemetryWork
                             .pipelineTelemetryIfEnabled(connection)
                             .thenCompose(conn -> conn.runInAutoCommitTransaction(
-                                    connectionContext.databaseNameFuture.getNow(null),
+                                    connectionContext.databaseNameFuture.getNow(DatabaseNameUtil.defaultDatabase()),
                                     asBoltAccessMode(mode),
                                     connectionContext.impersonatedUser,
                                     determineBookmarks(true).stream()
@@ -278,13 +294,14 @@ public class NetworkSession {
                 .thenCompose(connection -> {
                     var tx = new UnmanagedTransaction(
                             connection,
-                            connectionContext.databaseNameFuture.getNow(null),
+                            connectionContext.databaseNameFuture.getNow(DatabaseNameUtil.defaultDatabase()),
                             asBoltAccessMode(mode),
                             connectionContext.impersonatedUser,
                             this::handleNewBookmark,
                             fetchSize,
                             notificationConfig,
                             apiTelemetryWork,
+                            this::handleDatabaseName,
                             logging);
                     return tx.beginAsync(determineBookmarks(true), config, txType, flush);
                 });
@@ -398,17 +415,124 @@ public class NetworkSession {
                 connection.isOpen()); // and it's still open
     }
 
-    private org.neo4j.driver.internal.bolt.api.AccessMode asBoltAccessMode(AccessMode mode) {
-        return switch (mode) {
-            case WRITE -> org.neo4j.driver.internal.bolt.api.AccessMode.WRITE;
-            case READ -> org.neo4j.driver.internal.bolt.api.AccessMode.READ;
-        };
+    private void handleDatabaseName(String name) {
+        connectionContext.databaseNameFuture.complete(DatabaseNameUtil.database(name));
+        homeDatabaseCache.put(homeDatabaseKey, name);
     }
 
     private CompletionStage<BoltConnectionWithCloseTracking> acquireConnection(AccessMode mode) {
-        var currentConnectionStage = connectionStage;
+        var overrideAuthToken = connectionContext.overrideAuthToken();
+        var authTokenManager = overrideAuthToken != null ? NoopAuthTokenManager.INSTANCE : this.authTokenManager;
+        var newConnectionStage = pulledResultCursorStage(connectionStage)
+                .thenCompose(ignored -> securityPlanManager.plan())
+                .thenCompose(securityPlan -> acquireConnection(securityPlan, mode)
+                        .thenApply(connection -> (DriverBoltConnection)
+                                new BoltConnectionWithAuthTokenManager(connection, authTokenManager))
+                        .thenApply(BoltConnectionWithCloseTracking::new)
+                        .exceptionally(this::mapAcquisitionError));
+        connectionStage = newConnectionStage.exceptionally(error -> null);
+        return newConnectionStage;
+    }
 
-        var newConnectionStage = resultCursorStage
+    private BoltConnectionWithCloseTracking mapAcquisitionError(Throwable throwable) {
+        throwable = Futures.completionExceptionCause(throwable);
+        if (throwable instanceof TimeoutException) {
+            throw new ClientException(
+                    GqlStatusError.UNKNOWN.getStatus(),
+                    GqlStatusError.UNKNOWN.getStatusDescription(throwable.getMessage()),
+                    "N/A",
+                    throwable.getMessage(),
+                    GqlStatusError.DIAGNOSTIC_RECORD,
+                    throwable);
+        }
+        if (throwable instanceof MinVersionAcquisitionException minVersionAcquisitionException) {
+            if (connectionContext.overrideAuthToken() == null && connectionContext.impersonatedUser() != null) {
+                var message =
+                        "Detected connection that does not support impersonation, please make sure to have all servers running 4.4 version or above and communicating"
+                                + " over Bolt version 4.4 or above when using impersonation feature";
+                throw new ClientException(
+                        GqlStatusError.UNKNOWN.getStatus(),
+                        GqlStatusError.UNKNOWN.getStatusDescription(message),
+                        "N/A",
+                        message,
+                        GqlStatusError.DIAGNOSTIC_RECORD,
+                        null);
+            } else {
+                throw new CompletionException(new UnsupportedFeatureException(String.format(
+                        "Detected Bolt %s connection that does not support the auth token override feature, please make sure to have all servers communicating over Bolt 5.1 or above to use the feature",
+                        minVersionAcquisitionException.version())));
+            }
+        } else {
+            throw new CompletionException(throwable);
+        }
+    }
+
+    private CompletionStage<DriverBoltConnection> acquireConnection(SecurityPlan securityPlan, AccessMode mode) {
+        var databaseName = connectionContext.databaseNameFuture().getNow(null);
+        var impersonatedUser = connectionContext.impersonatedUser();
+        var minVersion = minBoltVersion(connectionContext);
+        var overrideAuthToken = connectionContext.overrideAuthToken();
+        var tokenStageSupplier = tokenStageSupplier(overrideAuthToken, authTokenManager);
+        var accessMode = asBoltAccessMode(mode);
+        var bookmarks = connectionContext.rediscoveryBookmarks().stream()
+                .map(Bookmark::value)
+                .collect(Collectors.toSet());
+        var additionalParameters = new HashMap<String, Object>();
+        if (databaseName == null) {
+            homeDatabaseCache.get(homeDatabaseKey).ifPresent(name -> additionalParameters.put(HOME_DATABASE_KEY, name));
+        }
+
+        Consumer<DatabaseName> databaseNameConsumer = (name) -> {
+            if (name != null) {
+                if (databaseName == null) {
+                    name.databaseName().ifPresent(n -> homeDatabaseCache.put(homeDatabaseKey, n));
+                }
+            } else {
+                name = DatabaseNameUtil.defaultDatabase();
+            }
+            connectionContext.databaseNameFuture().complete(name);
+        };
+
+        return boltConnectionProvider
+                .connect(
+                        securityPlan,
+                        databaseName,
+                        tokenStageSupplier,
+                        accessMode,
+                        bookmarks,
+                        impersonatedUser,
+                        minVersion,
+                        driverNotificationConfig,
+                        databaseNameConsumer,
+                        additionalParameters)
+                .thenCompose(boltConnection -> {
+                    if (additionalParameters.containsKey(HOME_DATABASE_KEY)
+                            && !boltConnection.serverSideRoutingEnabled()
+                            && !connectionContext.databaseNameFuture.isDone()) {
+                        // home database was requested with hint, but the returned connection does not have SSR enabled
+                        additionalParameters.remove(HOME_DATABASE_KEY);
+                        return boltConnection
+                                .close()
+                                .thenCompose(ignored -> boltConnectionProvider.connect(
+                                        securityPlan,
+                                        null,
+                                        tokenStageSupplier,
+                                        accessMode,
+                                        bookmarks,
+                                        impersonatedUser,
+                                        minVersion,
+                                        driverNotificationConfig,
+                                        databaseNameConsumer,
+                                        additionalParameters));
+                    } else {
+                        return CompletableFuture.completedStage(boltConnection);
+                    }
+                });
+    }
+
+    private CompletionStage<Void> pulledResultCursorStage(
+            CompletionStage<BoltConnectionWithCloseTracking> connectionStage) {
+        return resultCursorStage
                 .thenCompose(cursor -> {
                     if (cursor == null) {
                         return completedWithNull();
@@ -423,103 +547,13 @@ public class NetworkSession {
                         //   2) previous result has been successful and is fully consumed
                         //   3) previous result failed and error has been consumed
 
-                        // return existing connection, which should've been released back to the pool by now
-                        return currentConnectionStage.exceptionally(ignore -> null);
+                        // the existing connection should've been released back to the pool by now
+                        return connectionStage.handle((ignored, throwable) -> null);
                     } else {
                         // there exists unconsumed error, re-throw it
                         throw new CompletionException(error);
                     }
-                })
-                .thenCompose(ignored -> {
-                    var databaseName = connectionContext.databaseNameFuture.getNow(null);
-
-                    Supplier<CompletionStage<Map<String, Value>>> tokenStageSupplier;
-                    var minVersion = new AtomicReference<BoltProtocolVersion>();
-                    if (connectionContext.impersonatedUser() != null) {
-                        minVersion.set(new BoltProtocolVersion(4, 4));
-                    }
-                    var overrideAuthToken = connectionContext.overrideAuthToken();
-                    if (overrideAuthToken != null) {
-                        tokenStageSupplier = () -> CompletableFuture.completedStage(connectionContext.authToken)
-                                .thenApply(token -> ((InternalAuthToken) token).toMap());
-                        minVersion.set(new BoltProtocolVersion(5, 1));
-                    } else {
-                        tokenStageSupplier = () ->
-                                authTokenManager.getToken().thenApply(token -> ((InternalAuthToken) token).toMap());
-                    }
-                    return securityPlanManager.plan().thenCompose(securityPlan -> boltConnectionProvider
-                            .connect(
-                                    securityPlan,
-                                    databaseName,
-                                    tokenStageSupplier,
-                                    switch (mode) {
-                                        case WRITE -> org.neo4j.driver.internal.bolt.api.AccessMode.WRITE;
-                                        case READ -> org.neo4j.driver.internal.bolt.api.AccessMode.READ;
-                                    },
-                                    connectionContext.rediscoveryBookmarks().stream()
-                                            .map(Bookmark::value)
-                                            .collect(Collectors.toSet()),
-                                    connectionContext.impersonatedUser(),
-                                    minVersion.get(),
-                                    driverNotificationConfig,
-                                    (name) -> connectionContext
-                                            .databaseNameFuture()
-                                            .complete(name == null ? DatabaseNameUtil.defaultDatabase() : name))
-                            .thenApply(connection -> (DriverBoltConnection) new BoltConnectionWithAuthTokenManager(
-                                    connection,
-                                    overrideAuthToken != null
-                                            ? new AuthTokenManager() {
-                                                @Override
-                                                public CompletionStage<AuthToken> getToken() {
-                                                    return null;
-                                                }
-
-                                                @Override
-                                                public boolean handleSecurityException(
-                                                        AuthToken authToken, SecurityException exception) {
-                                                    return false;
-                                                }
-                                            }
-                                            : authTokenManager))
-                            .thenApply(BoltConnectionWithCloseTracking::new)
-                            .exceptionally(throwable -> {
-                                throwable = Futures.completionExceptionCause(throwable);
-                                if (throwable instanceof TimeoutException) {
-                                    throw new ClientException(
-                                            GqlStatusError.UNKNOWN.getStatus(),
-                                            GqlStatusError.UNKNOWN.getStatusDescription(throwable.getMessage()),
-                                            "N/A",
-                                            throwable.getMessage(),
-                                            GqlStatusError.DIAGNOSTIC_RECORD,
-                                            throwable);
-                                }
-                                if (throwable
-                                        instanceof MinVersionAcquisitionException minVersionAcquisitionException) {
-                                    if (overrideAuthToken == null && connectionContext.impersonatedUser() != null) {
-                                        var message =
-                                                "Detected connection that does not support impersonation, please make sure to have all servers running 4.4 version or above and communicating"
-                                                        + " over Bolt version 4.4 or above when using impersonation feature";
-                                        throw new ClientException(
-                                                GqlStatusError.UNKNOWN.getStatus(),
-                                                GqlStatusError.UNKNOWN.getStatusDescription(message),
-                                                "N/A",
-                                                message,
-                                                GqlStatusError.DIAGNOSTIC_RECORD,
-                                                null);
-                                    } else {
-                                        throw new CompletionException(new UnsupportedFeatureException(String.format(
-                                                "Detected Bolt %s connection that does not support the auth token override feature, please make sure to have all servers communicating over Bolt 5.1 or above to use the feature",
-                                                minVersionAcquisitionException.version())));
-                                    }
-                                } else {
-                                    throw new CompletionException(throwable);
-                                }
-                            }));
                 });
-
-        connectionStage = newConnectionStage.exceptionally(error -> null);
-
-        return newConnectionStage;
     }
 
     private CompletionStage<Throwable> closeTransactionAndReleaseConnection() {
@@ -602,6 +636,31 @@ public class NetworkSession {
         }
     }
 
+    private static BoltProtocolVersion minBoltVersion(NetworkSessionConnectionContext connectionContext) {
+        BoltProtocolVersion minBoltVersion = null;
+        if (connectionContext.overrideAuthToken() != null) {
+            minBoltVersion = new BoltProtocolVersion(5, 1);
+        } else if (connectionContext.impersonatedUser() != null) {
+            minBoltVersion = new BoltProtocolVersion(4, 4);
+        }
+        return minBoltVersion;
+    }
+
+    private static Supplier<CompletionStage<Map<String, Value>>> tokenStageSupplier(
+            AuthToken overrideAuthToken, AuthTokenManager authTokenManager) {
+        return overrideAuthToken != null
+                ? () -> CompletableFuture.completedStage(overrideAuthToken)
+                        .thenApply(token -> ((InternalAuthToken) token).toMap())
+                : () -> authTokenManager.getToken().thenApply(token -> ((InternalAuthToken) token).toMap());
+    }
+
+    private static org.neo4j.driver.internal.bolt.api.AccessMode asBoltAccessMode(AccessMode mode) {
+        return switch (mode) {
+            case WRITE -> org.neo4j.driver.internal.bolt.api.AccessMode.WRITE;
+            case READ -> org.neo4j.driver.internal.bolt.api.AccessMode.READ;
+        };
+    }
+
     /**
      * The {@link NetworkSessionConnectionContext#mode} can be mutable for a session connection context
      */
@@ -654,6 +713,7 @@ public class NetworkSession {
         private final Query query;
         private final Consumer<DatabaseBookmark> bookmarkConsumer;
         private final AtomicBoolean runFailed;
+        private final Consumer<String> databaseNameConsumer;
         private RunSummary runSummary;
         private Throwable error;
         private int ignoredCount;
@@ -663,12 +723,14 @@ public class NetworkSession {
                 DriverBoltConnection connection,
                 Query query,
                 Consumer<DatabaseBookmark> bookmarkConsumer,
-                AtomicBoolean runFailed) {
+                AtomicBoolean runFailed,
+                Consumer<String> databaseNameConsumer) {
             this.logging = logging;
             this.connection = connection;
             this.query = query;
             this.bookmarkConsumer = bookmarkConsumer;
             this.runFailed = runFailed;
+            this.databaseNameConsumer = Objects.requireNonNull(databaseNameConsumer);
         }
 
         @Override
@@ -687,6 +749,7 @@ public class NetworkSession {
         @Override
         public void onRunSummary(RunSummary summary) {
             runSummary = summary;
+            summary.databaseName().ifPresent(databaseNameConsumer);
         }
 
         @Override
@@ -714,6 +777,20 @@ public class NetworkSession {
                         GqlStatusError.DIAGNOSTIC_RECORD,
                         null));
             }
+        }
+    }
+
+    private static final class NoopAuthTokenManager implements AuthTokenManager {
+        static final NoopAuthTokenManager INSTANCE = new NoopAuthTokenManager();
+
+        @Override
+        public CompletionStage<AuthToken> getToken() {
+            return null;
+        }
+
+        @Override
+        public boolean handleSecurityException(AuthToken authToken, SecurityException exception) {
+            return false;
         }
     }
 }

@@ -135,7 +135,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
             String impersonatedUser,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer) {
+            Consumer<DatabaseName> databaseNameConsumer,
+            Map<String, Object> additionalParameters) {
         synchronized (this) {
             if (closeStage != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
@@ -341,7 +342,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                 impersonatedUser,
                                 minVersion,
                                 notificationConfig,
-                                (ignored) -> {})
+                                (ignored) -> {},
+                                Collections.emptyMap())
                         .whenComplete((boltConnection, throwable) -> {
                             var error = FutureUtil.completionExceptionCause(throwable);
                             if (error != null) {
@@ -407,6 +409,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
             var connection = connectionEntry.connection;
             // unusable
             if (connection.state() != BoltConnectionState.OPEN) {
+                connection.close();
                 iterator.remove();
                 continue;
             }
@@ -507,7 +510,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                         null,
                         null,
                         null,
-                        (ignored) -> {})
+                        (ignored) -> {},
+                        Collections.emptyMap())
                 .thenCompose(BoltConnection::close);
     }
 
@@ -522,7 +526,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                         null,
                         null,
                         null,
-                        (ignored) -> {})
+                        (ignored) -> {},
+                        Collections.emptyMap())
                 .thenCompose(boltConnection -> {
                     var supports = boltConnection.protocolVersion().compareTo(new BoltProtocolVersion(4, 0)) >= 0;
                     return boltConnection.close().thenApply(ignored -> supports);
@@ -540,7 +545,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                         null,
                         null,
                         null,
-                        (ignored) -> {})
+                        (ignored) -> {},
+                        Collections.emptyMap())
                 .thenCompose(boltConnection -> {
                     var supports = new BoltProtocolVersion(5, 1).compareTo(boltConnection.protocolVersion()) <= 0;
                     return boltConnection.close().thenApply(ignored -> supports);

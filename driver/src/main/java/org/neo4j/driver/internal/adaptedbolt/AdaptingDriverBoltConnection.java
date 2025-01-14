@@ -223,4 +223,9 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
     public boolean telemetrySupported() {
         return connection.telemetrySupported();
     }
+
+    @Override
+    public boolean serverSideRoutingEnabled() {
+        return connection.serverSideRoutingEnabled();
+    }
 }

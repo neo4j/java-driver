@@ -80,6 +80,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     private final BoltServerAddress serverAddress;
     private final BoltProtocolVersion protocolVersion;
     private final boolean telemetrySupported;
+    private final boolean serverSideRouting;
     private final AtomicReference<BoltConnectionState> stateRef = new AtomicReference<>(BoltConnectionState.OPEN);
     private final AtomicReference<CompletableFuture<AuthData>> authDataRef;
     private final Map<String, Value> routingContext;
@@ -104,6 +105,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         this.serverAddress = Objects.requireNonNull(connection.serverAddress());
         this.protocolVersion = Objects.requireNonNull(connection.protocol().version());
         this.telemetrySupported = connection.isTelemetryEnabled();
+        this.serverSideRouting = connection.isSsrEnabled();
         this.authDataRef = new AtomicReference<>(
                 CompletableFuture.completedFuture(new AuthDataImpl(authMap, latestAuthMillisFuture.join())));
         this.valueFactory = Objects.requireNonNull(valueFactory);
@@ -177,8 +179,8 @@ public final class BoltConnectionImpl implements BoltConnection {
                             }
 
                             @Override
-                            public void onSummary(Void summary) {
-                                handler.onBeginSummary(BeginSummaryImpl.INSTANCE);
+                            public void onSummary(BeginSummary summary) {
+                                handler.onBeginSummary(summary);
                             }
                         },
                         logging,
@@ -520,6 +522,11 @@ public final class BoltConnectionImpl implements BoltConnection {
         return telemetrySupported;
     }
 
+    @Override
+    public boolean serverSideRoutingEnabled() {
+        return serverSideRouting;
+    }
+
     private CompletionStage<Void> executeInEventLoop(Runnable runnable) {
         var executeFuture = new CompletableFuture<Void>();
         Runnable stageCompletingRunnable = () -> {
@@ -718,10 +725,6 @@ public final class BoltConnectionImpl implements BoltConnection {
             } catch (Throwable ignored) {
             }
         }
-    }
-
-    private static class BeginSummaryImpl implements BeginSummary {
-        private static final BeginSummary INSTANCE = new BeginSummaryImpl();
     }
 
     private static class TelemetrySummaryImpl implements TelemetrySummary {

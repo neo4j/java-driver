@@ -16,4 +16,8 @@
  */
 package org.neo4j.driver.internal.bolt.api.summary;
 
-public interface BeginSummary {}
+import java.util.Optional;
+
+public interface BeginSummary {
+    Optional<String> databaseName();
+}

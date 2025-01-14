@@ -42,6 +42,7 @@ import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.exception.BoltException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
+import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
 import org.neo4j.driver.internal.bolt.api.summary.PullSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
@@ -249,7 +250,7 @@ public class BoltProtocolV3 implements BoltProtocol {
             Map<String, Value> txMetadata,
             String txType,
             NotificationConfig notificationConfig,
-            MessageHandler<Void> handler,
+            MessageHandler<BeginSummary> handler,
             LoggingProvider logging,
             ValueFactory valueFactory) {
         var exception = verifyNotificationConfigSupported(notificationConfig);
@@ -262,7 +263,7 @@ public class BoltProtocolV3 implements BoltProtocol {
             return CompletableFuture.failedFuture(error);
         }
 
-        var beginTxFuture = new CompletableFuture<Void>();
+        var beginTxFuture = new CompletableFuture<BeginSummary>();
         var beginMessage = new BeginMessage(
                 bookmarks,
                 txTimeout,
@@ -275,11 +276,11 @@ public class BoltProtocolV3 implements BoltProtocol {
                 useLegacyNotifications(),
                 logging,
                 valueFactory);
-        beginTxFuture.whenComplete((ignored, throwable) -> {
+        beginTxFuture.whenComplete((summary, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
-                handler.onSummary(null);
+                handler.onSummary(summary);
             }
         });
         return connection.write(beginMessage, new BeginTxResponseHandler(beginTxFuture));

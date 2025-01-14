@@ -17,6 +17,7 @@
 package org.neo4j.driver.internal.bolt.api.summary;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface RunSummary {
     long queryId();
@@ -24,4 +25,6 @@ public interface RunSummary {
     List<String> keys();
 
     long resultAvailableAfter();
+
+    Optional<String> databaseName();
 }

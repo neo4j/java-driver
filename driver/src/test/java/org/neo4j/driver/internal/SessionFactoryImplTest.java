@@ -82,6 +82,7 @@ class SessionFactoryImplTest {
                 mock(DriverBoltConnectionProvider.class),
                 new FixedRetryLogic(0),
                 config,
-                mock(AuthTokenManager.class));
+                mock(AuthTokenManager.class),
+                mock());
     }
 }

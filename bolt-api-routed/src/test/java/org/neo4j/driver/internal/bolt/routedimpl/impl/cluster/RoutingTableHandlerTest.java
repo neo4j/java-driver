@@ -180,7 +180,8 @@ class RoutingTableHandlerTest {
                     Set<String> rediscoveryBookmarks,
                     String impersonatedUser,
                     Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
-                    BoltProtocolVersion minVersion) {
+                    BoltProtocolVersion minVersion,
+                    String homeDatabaseHint) {
                 throw new UnsupportedOperationException();
             }
 
@@ -251,7 +252,8 @@ class RoutingTableHandlerTest {
         Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter = requestedAddress -> {
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
             var connection = mock(BoltConnection.class);
-            given(boltConnectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            given(boltConnectionProvider.connect(
+                            any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
                     .willReturn(completedFuture(connection));
             return boltConnectionProvider;
         };
@@ -280,7 +282,8 @@ class RoutingTableHandlerTest {
         Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter = requestedAddress -> {
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
             var connection = mock(BoltConnection.class);
-            given(boltConnectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            given(boltConnectionProvider.connect(
+                            any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
                     .willReturn(completedFuture(connection));
             return boltConnectionProvider;
         };
@@ -340,14 +343,16 @@ class RoutingTableHandlerTest {
         return requestedAddress -> {
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
             if (unavailableAddresses.contains(requestedAddress)) {
-                given(boltConnectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                given(boltConnectionProvider.connect(
+                                any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
                         .willReturn(CompletableFuture.failedFuture(
                                 new BoltServiceUnavailableException(requestedAddress + " is unavailable!")));
                 return boltConnectionProvider;
             }
             var connection = mock(BoltConnection.class);
             when(connection.serverAddress()).thenReturn(requestedAddress);
-            given(boltConnectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            given(boltConnectionProvider.connect(
+                            any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
                     .willReturn(completedFuture(connection));
             return boltConnectionProvider;
         };

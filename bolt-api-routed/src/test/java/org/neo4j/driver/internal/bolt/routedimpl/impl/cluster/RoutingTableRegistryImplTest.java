@@ -106,7 +106,8 @@ class RoutingTableRegistryImplTest {
                 Collections.emptySet(),
                 null,
                 () -> CompletableFuture.completedStage(Collections.emptyMap()),
-                new BoltProtocolVersion(4, 1));
+                new BoltProtocolVersion(4, 1),
+                null);
 
         // Then
         assertTrue(map.containsKey(database));
@@ -136,7 +137,8 @@ class RoutingTableRegistryImplTest {
                         Collections.emptySet(),
                         null,
                         authStageSupplier,
-                        new BoltProtocolVersion(4, 1))
+                        new BoltProtocolVersion(4, 1),
+                        null)
                 .toCompletableFuture()
                 .join();
 
@@ -173,7 +175,8 @@ class RoutingTableRegistryImplTest {
                         Collections.emptySet(),
                         null,
                         authStageSupplier,
-                        new BoltProtocolVersion(4, 1))
+                        new BoltProtocolVersion(4, 1),
+                        null)
                 .toCompletableFuture()
                 .join();
 
