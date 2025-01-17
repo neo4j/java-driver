@@ -46,6 +46,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private boolean failed;
     private ChannelActivityLogger log;
     private ChannelErrorLogger errorLog;
+    private ManifestHandler manifestHandler;
 
     public HandshakeHandler(
             ChannelPipelineBuilder pipelineBuilder,
@@ -100,18 +101,47 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
-        var serverSuggestedVersion = BoltProtocolVersion.fromRawBytes(in.readInt());
-        log.log(System.Logger.Level.DEBUG, "S: [Bolt Handshake] %s", serverSuggestedVersion);
-
-        // this is a one-time handler, remove it when protocol version has been read
-        ctx.pipeline().remove(this);
-
-        var protocol = protocolForVersion(serverSuggestedVersion);
-        if (protocol != null) {
-            protocolSelected(serverSuggestedVersion, protocol.createMessageFormat(), ctx);
+        if (manifestHandler != null) {
+            try {
+                manifestHandler.decode(in);
+            } catch (Throwable e) {
+                fail(ctx, e);
+            }
         } else {
-            handleUnknownSuggestedProtocolVersion(serverSuggestedVersion, ctx);
+            var serverSuggestedVersion = BoltProtocolVersion.fromRawBytes(in.readInt());
+
+            if (new BoltProtocolVersion(255, 1).equals(serverSuggestedVersion)) {
+                log.log(System.Logger.Level.DEBUG, "S: [Bolt Handshake Manifest] v1", serverSuggestedVersion);
+                manifestHandler = new ManifestHandlerV1(ctx.channel(), logging);
+            } else {
+                log.log(System.Logger.Level.DEBUG, "S: [Bolt Handshake] %s", serverSuggestedVersion);
+
+                // this is a one-time handler, remove it when protocol version has been read
+                ctx.pipeline().remove(this);
+
+                var protocol = protocolForVersion(serverSuggestedVersion);
+                if (protocol != null) {
+                    protocolSelected(serverSuggestedVersion, protocol.createMessageFormat(), ctx);
+                } else {
+                    handleUnknownSuggestedProtocolVersion(serverSuggestedVersion, ctx);
+                }
+            }
         }
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        if (manifestHandler != null) {
+            // this is a one-time handler, remove it when protocol version has been read
+            ctx.pipeline().remove(this);
+            try {
+                var protocol = manifestHandler.complete();
+                protocolSelected(protocol.version(), protocol.createMessageFormat(), ctx);
+            } catch (Throwable e) {
+                fail(ctx, e);
+            }
+        }
+        super.channelReadComplete(ctx);
     }
 
     private BoltProtocol protocolForVersion(BoltProtocolVersion version) {

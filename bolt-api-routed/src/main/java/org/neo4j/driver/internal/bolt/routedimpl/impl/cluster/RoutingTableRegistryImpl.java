@@ -108,7 +108,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
         if (!databaseNameFuture.isDone()) {
             if (homeDatabaseHint != null) {
                 var handler = routingTableHandlers.get(DatabaseNameUtil.database(homeDatabaseHint));
-                if (handler != null && !handler.staleRoutingTable(mode)) {
+                if (handler != null && !handler.isStaleFor(mode)) {
                     return CompletableFuture.completedFuture(handler);
                 }
             }

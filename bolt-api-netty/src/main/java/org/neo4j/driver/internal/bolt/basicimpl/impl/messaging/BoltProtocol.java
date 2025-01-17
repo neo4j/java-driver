@@ -40,21 +40,7 @@ import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
 import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.api.values.ValueFactory;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v3.BoltProtocolV3;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v4.BoltProtocolV4;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v41.BoltProtocolV41;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v42.BoltProtocolV42;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v43.BoltProtocolV43;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v44.BoltProtocolV44;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v5.BoltProtocolV5;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v51.BoltProtocolV51;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v52.BoltProtocolV52;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v53.BoltProtocolV53;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v54.BoltProtocolV54;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v55.BoltProtocolV55;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v56.BoltProtocolV56;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v57.BoltProtocolV57;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v58.BoltProtocolV58;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.async.connection.BoltProtocolUtil;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.spi.Connection;
 
 public interface BoltProtocol {
@@ -156,37 +142,11 @@ public interface BoltProtocol {
     }
 
     static BoltProtocol forVersion(BoltProtocolVersion version) {
-        if (BoltProtocolV3.VERSION.equals(version)) {
-            return BoltProtocolV3.INSTANCE;
-        } else if (BoltProtocolV4.VERSION.equals(version)) {
-            return BoltProtocolV4.INSTANCE;
-        } else if (BoltProtocolV41.VERSION.equals(version)) {
-            return BoltProtocolV41.INSTANCE;
-        } else if (BoltProtocolV42.VERSION.equals(version)) {
-            return BoltProtocolV42.INSTANCE;
-        } else if (BoltProtocolV43.VERSION.equals(version)) {
-            return BoltProtocolV43.INSTANCE;
-        } else if (BoltProtocolV44.VERSION.equals(version)) {
-            return BoltProtocolV44.INSTANCE;
-        } else if (BoltProtocolV5.VERSION.equals(version)) {
-            return BoltProtocolV5.INSTANCE;
-        } else if (BoltProtocolV51.VERSION.equals(version)) {
-            return BoltProtocolV51.INSTANCE;
-        } else if (BoltProtocolV52.VERSION.equals(version)) {
-            return BoltProtocolV52.INSTANCE;
-        } else if (BoltProtocolV53.VERSION.equals(version)) {
-            return BoltProtocolV53.INSTANCE;
-        } else if (BoltProtocolV54.VERSION.equals(version)) {
-            return BoltProtocolV54.INSTANCE;
-        } else if (BoltProtocolV55.VERSION.equals(version)) {
-            return BoltProtocolV55.INSTANCE;
-        } else if (BoltProtocolV56.VERSION.equals(version)) {
-            return BoltProtocolV56.INSTANCE;
-        } else if (BoltProtocolV57.VERSION.equals(version)) {
-            return BoltProtocolV57.INSTANCE;
-        } else if (BoltProtocolV58.VERSION.equals(version)) {
-            return BoltProtocolV58.INSTANCE;
+        var protocol = BoltProtocolUtil.versionToProtocol.get(version);
+        if (protocol != null) {
+            return protocol;
+        } else {
+            throw new BoltClientException("Unknown protocol version: " + version);
         }
-        throw new BoltClientException("Unknown protocol version: " + version);
     }
 }

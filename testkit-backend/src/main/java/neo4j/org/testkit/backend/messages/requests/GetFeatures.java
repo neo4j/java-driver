@@ -32,7 +32,6 @@ import reactor.core.publisher.Mono;
 @Getter
 public class GetFeatures implements TestkitRequest {
     private static final Set<String> COMMON_FEATURES = new HashSet<>(Arrays.asList(
-            "Feature:Bolt:4.1",
             "Feature:Bolt:4.2",
             "Feature:Bolt:4.3",
             "Feature:Bolt:4.4",
@@ -76,7 +75,8 @@ public class GetFeatures implements TestkitRequest {
             "Feature:API:SSLClientCertificate",
             "Feature:API:Summary:GqlStatusObjects",
             "Feature:API:Driver:MaxConnectionLifetime",
-            "Optimization:HomeDatabaseCache"));
+            "Optimization:HomeDatabaseCache",
+            "Feature:Bolt:HandshakeManifestV1"));
 
     private static final Set<String> SYNC_FEATURES = new HashSet<>(Arrays.asList(
             "Feature:Bolt:3.0",

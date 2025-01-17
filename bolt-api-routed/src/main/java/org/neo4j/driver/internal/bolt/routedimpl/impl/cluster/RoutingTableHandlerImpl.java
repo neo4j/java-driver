@@ -210,7 +210,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
     }
 
     @Override
-    public synchronized boolean staleRoutingTable(AccessMode mode) {
+    public synchronized boolean isStaleFor(AccessMode mode) {
         if (refreshRoutingTableFuture != null) {
             return true;
         }

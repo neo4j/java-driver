@@ -26,8 +26,6 @@ import org.junit.jupiter.api.Test;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v3.BoltProtocolV3;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v4.BoltProtocolV4;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v41.BoltProtocolV41;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v42.BoltProtocolV42;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v43.BoltProtocolV43;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v44.BoltProtocolV44;
@@ -45,8 +43,6 @@ class BoltProtocolTest {
     void shouldCreateProtocolForKnownVersions() {
         assertAll(
                 () -> assertInstanceOf(BoltProtocolV3.class, BoltProtocol.forVersion(BoltProtocolV3.VERSION)),
-                () -> assertInstanceOf(BoltProtocolV4.class, BoltProtocol.forVersion(BoltProtocolV4.VERSION)),
-                () -> assertInstanceOf(BoltProtocolV41.class, BoltProtocol.forVersion(BoltProtocolV41.VERSION)),
                 () -> assertInstanceOf(BoltProtocolV42.class, BoltProtocol.forVersion(BoltProtocolV42.VERSION)),
                 () -> assertInstanceOf(BoltProtocolV43.class, BoltProtocol.forVersion(BoltProtocolV43.VERSION)),
                 () -> assertInstanceOf(BoltProtocolV44.class, BoltProtocol.forVersion(BoltProtocolV44.VERSION)),

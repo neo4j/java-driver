@@ -44,5 +44,5 @@ public interface RoutingTableHandler extends RoutingErrorHandler {
 
     RoutingTable routingTable();
 
-    boolean staleRoutingTable(AccessMode mode);
+    boolean isStaleFor(AccessMode mode);
 }
