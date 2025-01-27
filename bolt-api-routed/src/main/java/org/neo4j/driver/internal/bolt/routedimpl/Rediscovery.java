@@ -18,16 +18,15 @@ package org.neo4j.driver.internal.bolt.routedimpl;
 
 import java.net.UnknownHostException;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 
 /**
  * Provides cluster composition lookup capabilities and initial router address resolution.
@@ -39,7 +38,7 @@ public interface Rediscovery {
             Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion);
 
     List<BoltServerAddress> resolve() throws UnknownHostException;

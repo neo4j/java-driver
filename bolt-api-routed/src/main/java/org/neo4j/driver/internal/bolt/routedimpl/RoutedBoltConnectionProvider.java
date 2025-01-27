@@ -35,6 +35,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -51,7 +52,6 @@ import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.BoltConnectionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.routedimpl.impl.AuthTokenManagerExecutionException;
 import org.neo4j.driver.internal.bolt.routedimpl.impl.RoutedBoltConnection;
 import org.neo4j.driver.internal.bolt.routedimpl.impl.cluster.RediscoveryImpl;
@@ -137,7 +137,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     public CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             AccessMode mode,
             Set<String> bookmarks,
             String impersonatedUser,
@@ -155,8 +155,8 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             registry = this.registry;
         }
 
-        Supplier<CompletionStage<Map<String, Value>>> supplier =
-                () -> authMapStageSupplier.get().exceptionally(throwable -> {
+        Supplier<CompletionStage<AuthToken>> supplier =
+                () -> authTokenStageSupplier.get().exceptionally(throwable -> {
                     throw new AuthTokenManagerExecutionException(throwable);
                 });
 
@@ -208,12 +208,12 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
         RoutingTableRegistry registry;
         synchronized (this) {
             registry = this.registry;
         }
-        return supportsMultiDb(securityPlan, authMap)
+        return supportsMultiDb(securityPlan, authToken)
                 .thenCompose(supports -> registry.ensureRoutingTable(
                         securityPlan,
                         supports
@@ -222,7 +222,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                         AccessMode.READ,
                         Collections.emptySet(),
                         null,
-                        () -> CompletableFuture.completedStage(authMap),
+                        () -> CompletableFuture.completedStage(authToken),
                         null,
                         null))
                 .handle((ignored, error) -> {
@@ -240,19 +240,19 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
         return detectFeature(
                 securityPlan,
-                authMap,
+                authToken,
                 "Failed to perform multi-databases feature detection with the following servers: ",
                 (boltConnection -> boltConnection.protocolVersion().compareTo(new BoltProtocolVersion(4, 0)) >= 0));
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
         return detectFeature(
                 securityPlan,
-                authMap,
+                authToken,
                 "Failed to perform session auth feature detection with the following servers: ",
                 (boltConnection -> new BoltProtocolVersion(5, 1).compareTo(boltConnection.protocolVersion()) <= 0));
     }
@@ -271,7 +271,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
 
     private CompletionStage<Boolean> detectFeature(
             SecurityPlan securityPlan,
-            Map<String, Value> authMap,
+            AuthToken authToken,
             String baseErrorMessagePrefix,
             Function<BoltConnection, Boolean> featureDetectionFunction) {
         Rediscovery rediscovery;
@@ -306,7 +306,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                         .connect(
                                 securityPlan,
                                 null,
-                                () -> CompletableFuture.completedStage(authMap),
+                                () -> CompletableFuture.completedStage(authToken),
                                 AccessMode.WRITE,
                                 Collections.emptySet(),
                                 null,
@@ -339,7 +339,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             SecurityPlan securityPlan,
             AccessMode mode,
             RoutingTable routingTable,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             DatabaseName database,
             Set<String> bookmarks,
             String impersonatedUser,
@@ -352,7 +352,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                 mode,
                 routingTable,
                 result,
-                authMapStageSupplier,
+                authTokenStageSupplier,
                 attemptExceptions,
                 database,
                 bookmarks,
@@ -367,7 +367,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             AccessMode mode,
             RoutingTable routingTable,
             CompletableFuture<BoltConnection> result,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             List<Throwable> attemptErrors,
             DatabaseName database,
             Set<String> bookmarks,
@@ -392,7 +392,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                 .connect(
                         securityPlan,
                         database,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         impersonatedUser,
@@ -414,7 +414,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                                     mode,
                                     routingTable,
                                     result,
-                                    authMapStageSupplier,
+                                    authTokenStageSupplier,
                                     attemptErrors,
                                     database,
                                     bookmarks,

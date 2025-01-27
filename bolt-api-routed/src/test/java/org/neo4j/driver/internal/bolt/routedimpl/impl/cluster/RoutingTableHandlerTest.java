@@ -46,7 +46,6 @@ import static org.neo4j.driver.internal.bolt.routedimpl.impl.util.ClusterComposi
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -58,6 +57,8 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
+import org.neo4j.driver.internal.bolt.api.AuthTokens;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -66,7 +67,6 @@ import org.neo4j.driver.internal.bolt.api.ClusterComposition;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.routedimpl.ClusterCompositionLookupResult;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutingTable;
@@ -123,7 +123,7 @@ class RoutingTableHandlerTest {
                         SecurityPlan.INSECURE,
                         READ,
                         Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(Collections.emptyMap()),
+                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
                         new BoltProtocolVersion(4, 1))
                 .toCompletableFuture()
                 .join());
@@ -179,7 +179,7 @@ class RoutingTableHandlerTest {
                     AccessMode mode,
                     Set<String> rediscoveryBookmarks,
                     String impersonatedUser,
-                    Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+                    Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
                     BoltProtocolVersion minVersion,
                     String homeDatabaseHint) {
                 throw new UnsupportedOperationException();
@@ -212,7 +212,7 @@ class RoutingTableHandlerTest {
                         SecurityPlan.INSECURE,
                         READ,
                         Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(Collections.emptyMap()),
+                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
                         new BoltProtocolVersion(4, 1))
                 .toCompletableFuture()
                 .join();
@@ -239,7 +239,7 @@ class RoutingTableHandlerTest {
                         SecurityPlan.INSECURE,
                         READ,
                         Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(Collections.emptyMap()),
+                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
                         new BoltProtocolVersion(4, 1))
                 .toCompletableFuture()
                 .join());
@@ -266,7 +266,7 @@ class RoutingTableHandlerTest {
                         SecurityPlan.INSECURE,
                         mode,
                         Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(Collections.emptyMap()),
+                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
                         new BoltProtocolVersion(4, 1))
                 .toCompletableFuture()
                 .join();
@@ -297,7 +297,7 @@ class RoutingTableHandlerTest {
                         SecurityPlan.INSECURE,
                         notStaleMode,
                         Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(Collections.emptyMap()),
+                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
                         new BoltProtocolVersion(4, 1))
                 .toCompletableFuture()
                 .join());

@@ -23,7 +23,8 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import org.neo4j.driver.internal.bolt.api.AuthInfo;
+import org.neo4j.driver.internal.bolt.api.AuthTokens;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -159,7 +160,7 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
     @Override
     public CompletionStage<DriverBoltConnection> logon(Map<String, Value> authMap) {
         return connection
-                .logon(boltValueFactory.toBoltMap(authMap))
+                .logon(AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
                 .exceptionally(errorMapper::mapAndTrow)
                 .thenApply(ignored -> this);
     }
@@ -200,8 +201,8 @@ final class AdaptingDriverBoltConnection implements DriverBoltConnection {
     }
 
     @Override
-    public CompletionStage<AuthData> authData() {
-        return connection.authData().exceptionally(errorMapper::mapAndTrow);
+    public CompletionStage<AuthInfo> authData() {
+        return connection.authInfo().exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override

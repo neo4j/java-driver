@@ -20,7 +20,6 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -28,13 +27,13 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.routedimpl.ClusterCompositionLookupResult;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutingTable;
@@ -86,7 +85,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
             SecurityPlan securityPlan,
             AccessMode mode,
             Set<String> rediscoveryBookmarks,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion) {
         if (refreshRoutingTableFuture != null) {
             // refresh is already happening concurrently, just use it's result
@@ -109,7 +108,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
                             connectionProviderGetter,
                             rediscoveryBookmarks,
                             null,
-                            authMapStageSupplier,
+                            authTokenStageSupplier,
                             minVersion)
                     .whenComplete((composition, completionError) -> {
                         var error = FutureUtil.completionExceptionCause(completionError);

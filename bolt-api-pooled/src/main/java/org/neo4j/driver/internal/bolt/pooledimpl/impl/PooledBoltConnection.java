@@ -23,7 +23,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import org.neo4j.driver.internal.bolt.api.AuthInfo;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BasicResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
@@ -162,8 +163,8 @@ public class PooledBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<BoltConnection> logon(Map<String, Value> authMap) {
-        return delegate.logon(authMap).thenApply(ignored -> this);
+    public CompletionStage<BoltConnection> logon(AuthToken authToken) {
+        return delegate.logon(authToken).thenApply(ignored -> this);
     }
 
     @Override
@@ -321,8 +322,8 @@ public class PooledBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<AuthData> authData() {
-        return delegate.authData();
+    public CompletionStage<AuthInfo> authInfo() {
+        return delegate.authInfo();
     }
 
     @Override

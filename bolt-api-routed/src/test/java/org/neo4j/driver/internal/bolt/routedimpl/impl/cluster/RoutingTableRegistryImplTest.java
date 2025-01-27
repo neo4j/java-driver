@@ -40,7 +40,6 @@ import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -53,11 +52,12 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
+import org.neo4j.driver.internal.bolt.api.AuthTokens;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutingTable;
 import org.neo4j.driver.internal.bolt.routedimpl.impl.NoopLoggingProvider;
@@ -105,7 +105,7 @@ class RoutingTableRegistryImplTest {
                 AccessMode.READ,
                 Collections.emptySet(),
                 null,
-                () -> CompletableFuture.completedStage(Collections.emptyMap()),
+                () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
                 new BoltProtocolVersion(4, 1),
                 null);
 
@@ -125,8 +125,8 @@ class RoutingTableRegistryImplTest {
 
         var factory = mockedHandlerFactory();
         var routingTables = newRoutingTables(map, factory);
-        Supplier<CompletionStage<Map<String, Value>>> authStageSupplier =
-                () -> CompletableFuture.completedStage(Collections.emptyMap());
+        Supplier<CompletionStage<AuthToken>> authStageSupplier =
+                () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap()));
 
         // When
         var actual = routingTables
@@ -163,8 +163,8 @@ class RoutingTableRegistryImplTest {
         var factory = mockedHandlerFactory(handler);
         var routingTables = new RoutingTableRegistryImpl(
                 map, factory, null, null, Mockito.mock(Rediscovery.class), NoopLoggingProvider.INSTANCE);
-        Supplier<CompletionStage<Map<String, Value>>> authStageSupplier =
-                () -> CompletableFuture.completedStage(Collections.emptyMap());
+        Supplier<CompletionStage<AuthToken>> authStageSupplier =
+                () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap()));
 
         // When
         routingTables

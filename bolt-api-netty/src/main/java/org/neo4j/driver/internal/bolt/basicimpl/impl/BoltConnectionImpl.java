@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import org.neo4j.driver.internal.bolt.api.AuthInfo;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -82,7 +83,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     private final boolean telemetrySupported;
     private final boolean serverSideRouting;
     private final AtomicReference<BoltConnectionState> stateRef = new AtomicReference<>(BoltConnectionState.OPEN);
-    private final AtomicReference<CompletableFuture<AuthData>> authDataRef;
+    private final AtomicReference<CompletableFuture<AuthInfo>> authDataRef;
     private final Map<String, Value> routingContext;
     private final Queue<Function<ResponseHandler, CompletionStage<Void>>> messageWriters;
     private final Clock clock;
@@ -92,7 +93,7 @@ public final class BoltConnectionImpl implements BoltConnection {
             BoltProtocol protocol,
             Connection connection,
             EventLoop eventLoop,
-            Map<String, Value> authMap,
+            AuthToken authToken,
             CompletableFuture<Long> latestAuthMillisFuture,
             RoutingContext routingContext,
             Clock clock,
@@ -107,7 +108,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         this.telemetrySupported = connection.isTelemetryEnabled();
         this.serverSideRouting = connection.isSsrEnabled();
         this.authDataRef = new AtomicReference<>(
-                CompletableFuture.completedFuture(new AuthDataImpl(authMap, latestAuthMillisFuture.join())));
+                CompletableFuture.completedFuture(new AuthInfoImpl(authToken, latestAuthMillisFuture.join())));
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.routingContext = routingContext.toMap().entrySet().stream()
                 .collect(Collectors.toUnmodifiableMap(
@@ -369,10 +370,10 @@ public final class BoltConnectionImpl implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<BoltConnection> logon(Map<String, Value> authMap) {
+    public CompletionStage<BoltConnection> logon(AuthToken authToken) {
         return executeInEventLoop(() -> messageWriters.add(handler -> protocol.logon(
                         connection,
-                        authMap,
+                        authToken.asMap(),
                         clock,
                         new MessageHandler<>() {
                             @Override
@@ -383,7 +384,7 @@ public final class BoltConnectionImpl implements BoltConnection {
 
                             @Override
                             public void onSummary(Void summary) {
-                                authDataRef.get().complete(new AuthDataImpl(authMap, clock.millis()));
+                                authDataRef.get().complete(new AuthInfoImpl(authToken, clock.millis()));
                                 handler.onLogonSummary(null);
                             }
                         },
@@ -498,7 +499,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<AuthData> authData() {
+    public CompletionStage<AuthInfo> authInfo() {
         return authDataRef.get();
     }
 
@@ -572,7 +573,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         }
     }
 
-    private record AuthDataImpl(Map<String, Value> authMap, long authAckMillis) implements AuthData {}
+    private record AuthInfoImpl(AuthToken authToken, long authAckMillis) implements AuthInfo {}
 
     private static class ResponseHandleImpl implements ResponseHandler {
         private final ResponseHandler delegate;

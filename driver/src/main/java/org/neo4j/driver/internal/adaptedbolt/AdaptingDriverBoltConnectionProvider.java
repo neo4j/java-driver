@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthTokens;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -79,7 +80,9 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
         return delegate.connect(
                         securityPlan,
                         databaseName,
-                        () -> authMapStageSupplier.get().thenApply(boltValueFactory::toBoltMap),
+                        () -> authMapStageSupplier
+                                .get()
+                                .thenApply(map -> AuthTokens.custom(boltValueFactory.toBoltMap(map))),
                         mode,
                         bookmarks,
                         impersonatedUser,
@@ -96,19 +99,19 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
 
     @Override
     public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.verifyConnectivity(securityPlan, boltValueFactory.toBoltMap(authMap))
+        return delegate.verifyConnectivity(securityPlan, AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
                 .exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override
     public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsMultiDb(securityPlan, boltValueFactory.toBoltMap(authMap))
+        return delegate.supportsMultiDb(securityPlan, AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
                 .exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override
     public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsSessionAuth(securityPlan, boltValueFactory.toBoltMap(authMap))
+        return delegate.supportsSessionAuth(securityPlan, AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
                 .exceptionally(errorMapper::mapAndTrow);
     }
 

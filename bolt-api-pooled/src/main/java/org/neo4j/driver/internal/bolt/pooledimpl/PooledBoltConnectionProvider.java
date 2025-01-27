@@ -36,6 +36,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BasicResponseHandler;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
@@ -51,7 +52,6 @@ import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.BoltTransientException;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.pooledimpl.impl.PooledBoltConnection;
 import org.neo4j.driver.internal.bolt.pooledimpl.impl.util.FutureUtil;
 
@@ -129,7 +129,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     public CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             AccessMode mode,
             Set<String> bookmarks,
             String impersonatedUser,
@@ -145,7 +145,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
 
         var acquisitionFuture = new CompletableFuture<PooledBoltConnection>();
 
-        authMapStageSupplier.get().whenComplete((authMap, authThrowable) -> {
+        authTokenStageSupplier.get().whenComplete((authToken, authThrowable) -> {
             if (authThrowable != null) {
                 acquisitionFuture.completeExceptionally(authThrowable);
                 return;
@@ -168,8 +168,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                     acquisitionFuture,
                     securityPlan,
                     databaseName,
-                    authMap,
-                    authMapStageSupplier,
+                    authToken,
+                    authTokenStageSupplier,
                     mode,
                     bookmarks,
                     impersonatedUser,
@@ -191,8 +191,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
             CompletableFuture<PooledBoltConnection> acquisitionFuture,
             SecurityPlan securityPlan,
             DatabaseName databaseName,
-            Map<String, Value> authMap,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            AuthToken authToken,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             AccessMode mode,
             Set<String> bookmarks,
             String impersonatedUser,
@@ -207,7 +207,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 empty.set(pooledConnectionEntries.isEmpty());
                 try {
                     // go over existing entries first
-                    connectionEntryWithMetadata = acquireExistingEntry(authMap, minVersion);
+                    connectionEntryWithMetadata = acquireExistingEntry(authToken, minVersion);
                 } catch (MinVersionAcquisitionException e) {
                     acquisitionFuture.completeExceptionally(e);
                     return;
@@ -284,8 +284,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                 acquisitionFuture,
                                 securityPlan,
                                 databaseName,
-                                authMap,
-                                authMapStageSupplier,
+                                authToken,
+                                authTokenStageSupplier,
                                 mode,
                                 bookmarks,
                                 impersonatedUser,
@@ -305,7 +305,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                     purge(entry);
                                     metricsListener.afterConnectionReleased(poolId, inUseEvent);
                                 });
-                        reauthStage(entryWithMetadata, authMap).whenComplete((ignored2, throwable2) -> {
+                        reauthStage(entryWithMetadata, authToken).whenComplete((ignored2, throwable2) -> {
                             if (!acquisitionFuture.complete(pooledConnection)) {
                                 // acquisition timed out
                                 CompletableFuture<PooledBoltConnection> pendingAcquisition;
@@ -336,7 +336,9 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                         .connect(
                                 securityPlan,
                                 databaseName,
-                                empty.get() ? () -> CompletableFuture.completedStage(authMap) : authMapStageSupplier,
+                                empty.get()
+                                        ? () -> CompletableFuture.completedStage(authToken)
+                                        : authTokenStageSupplier,
                                 mode,
                                 bookmarks,
                                 impersonatedUser,
@@ -395,7 +397,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     private synchronized ConnectionEntryWithMetadata acquireExistingEntry(
-            Map<String, Value> authMap, BoltProtocolVersion minVersion) {
+            AuthToken authToken, BoltProtocolVersion minVersion) {
         ConnectionEntryWithMetadata connectionEntryWithMetadata = null;
         var iterator = pooledConnectionEntries.iterator();
         while (iterator.hasNext()) {
@@ -431,10 +433,10 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
             }
 
             // the pool must not have unauthenticated connections
-            var authData = connection.authData().toCompletableFuture().getNow(null);
+            var authInfo = connection.authInfo().toCompletableFuture().getNow(null);
 
-            var expiredByError = minAuthTimestamp > 0 && authData.authAckMillis() <= minAuthTimestamp;
-            var authMatches = authMap.equals(authData.authMap());
+            var expiredByError = minAuthTimestamp > 0 && authInfo.authAckMillis() <= minAuthTimestamp;
+            var authMatches = authToken.equals(authInfo.authToken());
             var reauthNeeded = expiredByError || !authMatches;
 
             if (reauthNeeded) {
@@ -461,14 +463,14 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     private CompletionStage<Void> reauthStage(
-            ConnectionEntryWithMetadata connectionEntryWithMetadata, Map<String, Value> authMap) {
+            ConnectionEntryWithMetadata connectionEntryWithMetadata, AuthToken authToken) {
         CompletionStage<Void> stage;
         if (connectionEntryWithMetadata.reauthNeeded) {
             stage = connectionEntryWithMetadata
                     .connectionEntry
                     .connection
                     .logoff()
-                    .thenCompose(conn -> conn.logon(authMap))
+                    .thenCompose(conn -> conn.logon(authToken))
                     .handle((ignored, throwable) -> {
                         if (throwable != null) {
                             connectionEntryWithMetadata.connectionEntry.connection.close();
@@ -500,11 +502,11 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
         return connect(
                         securityPlan,
                         null,
-                        () -> CompletableFuture.completedStage(authMap),
+                        () -> CompletableFuture.completedStage(authToken),
                         AccessMode.WRITE,
                         Collections.emptySet(),
                         null,
@@ -516,11 +518,11 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
         return connect(
                         securityPlan,
                         null,
-                        () -> CompletableFuture.completedStage(authMap),
+                        () -> CompletableFuture.completedStage(authToken),
                         AccessMode.WRITE,
                         Collections.emptySet(),
                         null,
@@ -535,11 +537,11 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
         return connect(
                         securityPlan,
                         null,
-                        () -> CompletableFuture.completedStage(authMap),
+                        () -> CompletableFuture.completedStage(authToken),
                         AccessMode.WRITE,
                         Collections.emptySet(),
                         null,

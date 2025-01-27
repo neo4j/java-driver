@@ -21,7 +21,6 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 
 public interface BoltConnectionProvider {
     CompletionStage<Void> init(
@@ -35,7 +34,7 @@ public interface BoltConnectionProvider {
     CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             AccessMode mode,
             Set<String> bookmarks,
             String impersonatedUser,
@@ -44,11 +43,11 @@ public interface BoltConnectionProvider {
             Consumer<DatabaseName> databaseNameConsumer,
             Map<String, Object> additionalParameters);
 
-    CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap);
+    CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken);
 
-    CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap);
+    CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken);
 
-    CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap);
+    CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken);
 
     CompletionStage<Void> close();
 }

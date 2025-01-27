@@ -16,15 +16,14 @@
  */
 package org.neo4j.driver.internal.bolt.routedimpl.impl.cluster;
 
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.routedimpl.ClusterCompositionLookupResult;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutingTable;
 
@@ -37,7 +36,7 @@ public interface RoutingTableHandler extends RoutingErrorHandler {
             SecurityPlan securityPlan,
             AccessMode mode,
             Set<String> rediscoveryBookmarks,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion);
 
     CompletionStage<RoutingTable> updateRoutingTable(ClusterCompositionLookupResult compositionLookupResult);
