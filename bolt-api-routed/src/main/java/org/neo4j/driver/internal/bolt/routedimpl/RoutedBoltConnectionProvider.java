@@ -143,8 +143,11 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             String impersonatedUser,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer) {
+            Consumer<DatabaseName> databaseNameConsumer,
+            Map<String, Object> additionalParameters) {
         RoutingTableRegistry registry;
+        var homeDatabaseHintObj = additionalParameters.get("homeDatabase");
+        var homeDatabaseHint = homeDatabaseHintObj instanceof String ? (String) homeDatabaseHintObj : null;
         synchronized (this) {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
@@ -167,7 +170,14 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             }
         });
         return registry.ensureRoutingTable(
-                        securityPlan, databaseNameFuture, mode, bookmarks, impersonatedUser, supplier, minVersion)
+                        securityPlan,
+                        databaseNameFuture,
+                        mode,
+                        bookmarks,
+                        impersonatedUser,
+                        supplier,
+                        minVersion,
+                        homeDatabaseHint)
                 .thenApply(routingTableHandler -> {
                     handlerRef.set(routingTableHandler);
                     return routingTableHandler;
@@ -213,6 +223,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                         Collections.emptySet(),
                         null,
                         () -> CompletableFuture.completedStage(authMap),
+                        null,
                         null))
                 .handle((ignored, error) -> {
                     if (error != null) {
@@ -301,7 +312,8 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                                 null,
                                 null,
                                 null,
-                                (ignored) -> {})
+                                (ignored) -> {},
+                                Collections.emptyMap())
                         .thenCompose(boltConnection -> {
                             var featureDetected = featureDetectionFunction.apply(boltConnection);
                             return boltConnection.close().thenApply(ignored -> featureDetected);
@@ -386,7 +398,8 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                         impersonatedUser,
                         minVersion,
                         notificationConfig,
-                        (ignored) -> {})
+                        (ignored) -> {},
+                        Collections.emptyMap())
                 .whenComplete((connection, completionError) -> {
                     var error = FutureUtil.completionExceptionCause(completionError);
                     if (error != null) {

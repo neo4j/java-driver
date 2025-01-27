@@ -19,6 +19,7 @@ package org.neo4j.driver.internal.bolt.basicimpl.impl.handlers;
 import static org.neo4j.driver.internal.bolt.basicimpl.impl.async.connection.ChannelAttributes.setConnectionId;
 import static org.neo4j.driver.internal.bolt.basicimpl.impl.async.connection.ChannelAttributes.setConnectionReadTimeout;
 import static org.neo4j.driver.internal.bolt.basicimpl.impl.async.connection.ChannelAttributes.setServerAgent;
+import static org.neo4j.driver.internal.bolt.basicimpl.impl.async.connection.ChannelAttributes.setSsrEnabled;
 import static org.neo4j.driver.internal.bolt.basicimpl.impl.async.connection.ChannelAttributes.setTelemetryEnabled;
 import static org.neo4j.driver.internal.bolt.basicimpl.impl.util.MetadataExtractor.extractServer;
 
@@ -35,6 +36,7 @@ public class HelloV51ResponseHandler implements ResponseHandler {
     public static final String CONFIGURATION_HINTS_KEY = "hints";
     public static final String CONNECTION_RECEIVE_TIMEOUT_SECONDS_KEY = "connection.recv_timeout_seconds";
     public static final String TELEMETRY_ENABLED_KEY = "telemetry.enabled";
+    public static final String SSR_ENABLED_KEY = "ssr.enabled";
 
     private final Channel channel;
     private final CompletableFuture<String> helloFuture;
@@ -85,6 +87,12 @@ public class HelloV51ResponseHandler implements ResponseHandler {
                         return !value.isNull() && value.asBoolean();
                     })
                     .ifPresent(telemetryEnabled -> setTelemetryEnabled(channel, telemetryEnabled));
+
+            getFromSupplierOrEmptyOnException(() -> {
+                        var value = configurationHints.get(SSR_ENABLED_KEY);
+                        return !value.isNull() && value.asBoolean();
+                    })
+                    .ifPresent(telemetryEnabled -> setSsrEnabled(channel, telemetryEnabled));
         }
     }
 

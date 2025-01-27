@@ -53,6 +53,7 @@ public class NetworkConnection implements Connection {
     private final String serverAgent;
     private final BoltServerAddress serverAddress;
     private final boolean telemetryEnabled;
+    private final boolean ssrEnabled;
     private final BoltProtocol protocol;
 
     private final Long connectionReadTimeout;
@@ -67,6 +68,7 @@ public class NetworkConnection implements Connection {
         this.serverAgent = ChannelAttributes.serverAgent(channel);
         this.serverAddress = ChannelAttributes.serverAddress(channel);
         this.telemetryEnabled = ChannelAttributes.telemetryEnabled(channel);
+        this.ssrEnabled = ChannelAttributes.ssrEnabled(channel);
         this.protocol = BoltProtocol.forChannel(channel);
         this.connectionReadTimeout =
                 ChannelAttributes.connectionReadTimeout(channel).orElse(null);
@@ -109,6 +111,11 @@ public class NetworkConnection implements Connection {
     @Override
     public boolean isTelemetryEnabled() {
         return telemetryEnabled;
+    }
+
+    @Override
+    public boolean isSsrEnabled() {
+        return ssrEnabled;
     }
 
     @Override

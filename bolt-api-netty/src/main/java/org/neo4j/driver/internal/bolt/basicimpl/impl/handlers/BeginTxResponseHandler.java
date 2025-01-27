@@ -20,20 +20,24 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.spi.ResponseHandler;
 
 public class BeginTxResponseHandler implements ResponseHandler {
-    private final CompletableFuture<Void> beginTxFuture;
+    private final CompletableFuture<BeginSummary> beginTxFuture;
 
-    public BeginTxResponseHandler(CompletableFuture<Void> beginTxFuture) {
+    public BeginTxResponseHandler(CompletableFuture<BeginSummary> beginTxFuture) {
         this.beginTxFuture = requireNonNull(beginTxFuture);
     }
 
     @Override
     public void onSuccess(Map<String, Value> metadata) {
-        beginTxFuture.complete(null);
+        var db = metadata.get("db");
+        var databaseName = db != null ? db.asString() : null;
+        beginTxFuture.complete(new BeginSummaryImpl(databaseName));
     }
 
     @Override
@@ -45,5 +49,12 @@ public class BeginTxResponseHandler implements ResponseHandler {
     public void onRecord(Value[] fields) {
         throw new UnsupportedOperationException(
                 "Transaction begin is not expected to receive records: " + Arrays.toString(fields));
+    }
+
+    private record BeginSummaryImpl(String database) implements BeginSummary {
+        @Override
+        public Optional<String> databaseName() {
+            return Optional.ofNullable(database);
+        }
     }
 }

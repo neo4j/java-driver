@@ -78,6 +78,11 @@ public class RxResultCursorImpl extends AbstractRecordStateResponseHandler
         public long resultAvailableAfter() {
             return -1;
         }
+
+        @Override
+        public Optional<String> databaseName() {
+            return Optional.empty();
+        }
     };
     private final Logger log;
     private final DriverBoltConnection boltConnection;

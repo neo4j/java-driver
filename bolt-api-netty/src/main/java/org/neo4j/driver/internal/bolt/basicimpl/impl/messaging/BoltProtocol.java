@@ -34,6 +34,7 @@ import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.exception.BoltClientException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
+import org.neo4j.driver.internal.bolt.api.summary.BeginSummary;
 import org.neo4j.driver.internal.bolt.api.summary.DiscardSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
 import org.neo4j.driver.internal.bolt.api.summary.RunSummary;
@@ -53,6 +54,7 @@ import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v54.BoltProtocolV
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v55.BoltProtocolV55;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v56.BoltProtocolV56;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v57.BoltProtocolV57;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v58.BoltProtocolV58;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.spi.Connection;
 
 public interface BoltProtocol {
@@ -90,7 +92,7 @@ public interface BoltProtocol {
             Map<String, Value> txMetadata,
             String txType,
             NotificationConfig notificationConfig,
-            MessageHandler<Void> handler,
+            MessageHandler<BeginSummary> handler,
             LoggingProvider logging,
             ValueFactory valueFactory);
 
@@ -182,6 +184,8 @@ public interface BoltProtocol {
             return BoltProtocolV56.INSTANCE;
         } else if (BoltProtocolV57.VERSION.equals(version)) {
             return BoltProtocolV57.INSTANCE;
+        } else if (BoltProtocolV58.VERSION.equals(version)) {
+            return BoltProtocolV58.INSTANCE;
         }
         throw new BoltClientException("Unknown protocol version: " + version);
     }

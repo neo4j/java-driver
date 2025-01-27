@@ -302,6 +302,11 @@ public class RoutedBoltConnection implements BoltConnection {
         return delegate.telemetrySupported();
     }
 
+    @Override
+    public boolean serverSideRoutingEnabled() {
+        return delegate.serverSideRoutingEnabled();
+    }
+
     private Throwable handledError(Throwable receivedError, boolean notifyHandler) {
         var error = FutureUtil.completionExceptionCause(receivedError);
 

@@ -108,6 +108,8 @@ public class NewDriver implements TestkitRequest {
                         .map(NotificationClassification::valueOf)
                         .collect(Collectors.toSet()))
                 .ifPresent(configBuilder::withDisabledNotificationClassifications);
+        Optional.ofNullable(data.maxConnectionLifetimeMs)
+                .ifPresent(timeout -> configBuilder.withMaxConnectionLifetime(timeout, TimeUnit.MILLISECONDS));
         configBuilder.withDriverMetrics();
         var clientCertificateManager = Optional.ofNullable(data.getClientCertificateProviderId())
                 .map(testkitState::getClientCertificateManager)
@@ -299,6 +301,7 @@ public class NewDriver implements TestkitRequest {
         private Boolean telemetryDisabled;
         private ClientCertificate clientCertificate;
         private String clientCertificateProviderId;
+        private Long maxConnectionLifetimeMs;
     }
 
     @RequiredArgsConstructor

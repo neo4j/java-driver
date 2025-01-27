@@ -260,6 +260,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         var bookmarks = Collections.singleton(InternalBookmark.parse("SomeBookmark"));
@@ -292,6 +293,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         var bookmarks = Collections.singleton(InternalBookmark.parse("SomeBookmark"));
@@ -316,6 +318,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         tx.markTerminated(null);
@@ -344,6 +347,7 @@ class UnmanagedTransactionTest {
                 resultCursorsHolder,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         tx.markTerminated(terminationCause);
@@ -370,6 +374,7 @@ class UnmanagedTransactionTest {
                 resultCursorsHolder,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         tx.markTerminated(terminationCause);
@@ -397,6 +402,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         tx.markTerminated(terminationCause);
@@ -421,6 +427,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         tx.markTerminated(null);
@@ -449,6 +456,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         await(tx.closeAsync());
@@ -478,6 +486,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
         var bookmarks = Collections.singleton(InternalBookmark.parse("SomeBookmark"));
         var txConfig = TransactionConfig.empty();
@@ -510,6 +519,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
         var bookmarks = Collections.singleton(InternalBookmark.parse("SomeBookmark"));
         var txConfig = TransactionConfig.empty();
@@ -550,6 +560,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         var initialStage = mapTransactionAction(initialAction, tx).get();
@@ -612,6 +623,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         var originalActionStage = mapTransactionAction(initialAction, tx).get();
@@ -672,6 +684,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
 
         var originalActionStage = mapTransactionAction(originalAction, tx).get();
@@ -875,6 +888,7 @@ class UnmanagedTransactionTest {
                 -1,
                 null,
                 apiTelemetryWork,
+                mock(),
                 Logging.none());
         return await(tx.beginAsync(initialBookmarks, TransactionConfig.empty(), null, true));
     }

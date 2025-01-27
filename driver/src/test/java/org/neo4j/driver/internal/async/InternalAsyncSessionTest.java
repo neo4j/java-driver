@@ -100,7 +100,7 @@ class InternalAsyncSessionTest {
         given(connection.onLoop()).willReturn(CompletableFuture.completedStage(connection));
         given(connection.close()).willReturn(completedFuture(null));
         connectionProvider = mock(DriverBoltConnectionProvider.class);
-        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(connectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .willAnswer((Answer<CompletionStage<DriverBoltConnection>>) invocation -> {
                     var database = (DatabaseName) invocation.getArguments()[1];
                     @SuppressWarnings("unchecked")
@@ -311,7 +311,7 @@ class InternalAsyncSessionTest {
         var e = assertThrows(Exception.class, () -> executeTransaction(asyncSession, transactionMode, work));
         assertEquals(error, e);
 
-        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(connectionProvider).connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verify(connection).beginTransaction(any(), any(), any(), any(), any(), any(), any(), any(), any());
         verifyRollbackTx(connection);
     }

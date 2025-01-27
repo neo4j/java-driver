@@ -39,6 +39,7 @@ import org.neo4j.driver.internal.async.NetworkSession;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.homedb.HomeDatabaseCache;
 import org.neo4j.driver.internal.retry.RetryLogic;
 import org.neo4j.driver.internal.security.BoltSecurityPlanManager;
 import org.neo4j.driver.internal.security.InternalAuthToken;
@@ -51,13 +52,15 @@ public class SessionFactoryImpl implements SessionFactory {
     private final boolean leakedSessionsLoggingEnabled;
     private final long defaultFetchSize;
     private final AuthTokenManager authTokenManager;
+    private final HomeDatabaseCache homeDatabaseCache;
 
     SessionFactoryImpl(
             BoltSecurityPlanManager securityPlanManager,
             DriverBoltConnectionProvider connectionProvider,
             RetryLogic retryLogic,
             Config config,
-            AuthTokenManager authTokenManager) {
+            AuthTokenManager authTokenManager,
+            HomeDatabaseCache homeDatabaseCache) {
         this.securityPlanManager = Objects.requireNonNull(securityPlanManager);
         this.connectionProvider = connectionProvider;
         this.leakedSessionsLoggingEnabled = config.logLeakedSessions();
@@ -65,6 +68,7 @@ public class SessionFactoryImpl implements SessionFactory {
         this.logging = config.logging();
         this.defaultFetchSize = config.fetchSize();
         this.authTokenManager = authTokenManager;
+        this.homeDatabaseCache = Objects.requireNonNull(homeDatabaseCache);
     }
 
     @Override
@@ -88,7 +92,8 @@ public class SessionFactoryImpl implements SessionFactory {
                 sessionConfig.notificationConfig(),
                 overrideAuthToken,
                 telemetryDisabled,
-                authTokenManager);
+                authTokenManager,
+                homeDatabaseCache);
     }
 
     private Set<Bookmark> toDistinctSet(Iterable<Bookmark> bookmarks) {
@@ -176,7 +181,8 @@ public class SessionFactoryImpl implements SessionFactory {
             NotificationConfig notificationConfig,
             AuthToken authToken,
             boolean telemetryDisabled,
-            AuthTokenManager authTokenManager) {
+            AuthTokenManager authTokenManager,
+            HomeDatabaseCache homeDatabaseCache) {
         Objects.requireNonNull(bookmarks, "bookmarks may not be null");
         Objects.requireNonNull(bookmarkManager, "bookmarkManager may not be null");
         return leakedSessionsLoggingEnabled
@@ -195,7 +201,8 @@ public class SessionFactoryImpl implements SessionFactory {
                         notificationConfig,
                         authToken,
                         telemetryDisabled,
-                        authTokenManager)
+                        authTokenManager,
+                        homeDatabaseCache)
                 : new NetworkSession(
                         securityPlanManager,
                         connectionProvider,
@@ -211,7 +218,8 @@ public class SessionFactoryImpl implements SessionFactory {
                         notificationConfig,
                         authToken,
                         telemetryDisabled,
-                        authTokenManager);
+                        authTokenManager,
+                        homeDatabaseCache);
     }
 
     public DriverBoltConnectionProvider getConnectionProvider() {

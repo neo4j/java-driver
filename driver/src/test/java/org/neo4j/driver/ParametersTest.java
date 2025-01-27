@@ -117,7 +117,8 @@ class ParametersTest {
                 Config.defaultConfig().notificationConfig(),
                 null,
                 false,
-                mock(AuthTokenManager.class));
+                mock(AuthTokenManager.class),
+                mock());
         return new InternalSession(session);
     }
 }
