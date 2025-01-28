@@ -18,28 +18,74 @@ package org.neo4j.driver.exceptions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.driver.Value;
 
 class Neo4jExceptionTest {
 
-    @Test
-    void shouldInit() {
-        var gqlStatus = "status";
-        var description = "description";
-        var code = "code";
-        var message = "message";
-        var map = new HashMap<String, Value>();
-        var throwable = new Neo4jException(gqlStatus, description, code, message, map, null);
+    @ParameterizedTest
+    @MethodSource("shouldInitArgs")
+    void shouldInit(
+            String gqlStatus,
+            String description,
+            String code,
+            String message,
+            Map<String, Value> diagnosticRecord,
+            Throwable cause) {
 
-        var exception = new Neo4jException(gqlStatus, description, code, message, map, throwable);
+        var exception = new Neo4jException(gqlStatus, description, code, message, diagnosticRecord, cause);
 
         assertEquals(gqlStatus, exception.gqlStatus());
         assertEquals(description, exception.statusDescription());
         assertEquals(code, exception.code());
         assertEquals(message, exception.getMessage());
-        assertEquals(map, exception.diagnosticRecord());
-        assertEquals(throwable, exception.gqlCause().orElse(null));
+        assertEquals(diagnosticRecord, exception.diagnosticRecord());
+        assertEquals(cause, exception.getCause());
+        assertEquals(cause, exception.gqlCause().orElse(null));
+    }
+
+    private static Stream<Arguments> shouldInitArgs() {
+        return Stream.of(
+                Arguments.of(
+                        "status",
+                        "description",
+                        "code",
+                        "message",
+                        Collections.emptyMap(),
+                        new Neo4jException("status", "description", "code", "message", Collections.emptyMap(), null)),
+                Arguments.of(
+                        "status",
+                        "description",
+                        "code",
+                        "message",
+                        Collections.emptyMap(),
+                        new ServiceUnavailableException("message")));
+    }
+
+    @Test
+    void shouldFindGqlCauseOnNonInterruptedChainOnly() {
+        var exception4 = new ServiceUnavailableException("message", null);
+        var exception3 = new IllegalStateException("message", exception4);
+        var exception2 =
+                new Neo4jException("status", "description", "code", "message", Collections.emptyMap(), exception3);
+        var exception1 =
+                new Neo4jException("status", "description", "code", "message", Collections.emptyMap(), exception2);
+        var exception =
+                new ClientException("status", "description", "code", "message", Collections.emptyMap(), exception1);
+
+        assertError(exception, exception1, exception1);
+        assertError(exception1, exception2, exception2);
+        assertError(exception2, exception3, null);
+    }
+
+    private void assertError(Neo4jException exception, Throwable expectedCause, Neo4jException expectedGqlCause) {
+        assertEquals(expectedCause, exception.getCause());
+        assertEquals(expectedGqlCause, exception.gqlCause().orElse(null));
     }
 }

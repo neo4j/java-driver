@@ -244,10 +244,10 @@ public class Neo4jException extends RuntimeException {
         if (cause == null) {
             return Optional.empty();
         }
-        if (cause.getClass().isAssignableFrom(targetCls)) {
+        if (targetCls.isAssignableFrom(cause.getClass())) {
             return Optional.of(targetCls.cast(cause));
         } else {
-            return findFirstGqlCause(cause, targetCls);
+            return Optional.empty();
         }
     }
 }
