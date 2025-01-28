@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -60,6 +61,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
+import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -70,6 +72,7 @@ import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
+import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
@@ -566,7 +569,15 @@ class RediscoveryTest {
         var logging = mock(LoggingProvider.class);
         var logger = mock(System.Logger.class);
         when(logging.getLog(any(Class.class))).thenReturn(logger);
-        Rediscovery rediscovery = new RediscoveryImpl(A, resolver, logging, DefaultDomainNameResolver.getInstance());
+        Rediscovery rediscovery = new RediscoveryImpl(
+                A,
+                resolver,
+                logging,
+                DefaultDomainNameResolver.getInstance(),
+                RoutingContext.EMPTY,
+                mock(BoltAgent.class),
+                "userAgent",
+                0);
         var table = routingTableMock(A);
 
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
@@ -596,7 +607,15 @@ class RediscoveryTest {
         var domainNameResolver = mock(DomainNameResolver.class);
         var localhost = InetAddress.getLocalHost();
         when(domainNameResolver.resolve(A.host())).thenReturn(new InetAddress[] {localhost});
-        Rediscovery rediscovery = new RediscoveryImpl(A, resolver, NoopLoggingProvider.INSTANCE, domainNameResolver);
+        Rediscovery rediscovery = new RediscoveryImpl(
+                A,
+                resolver,
+                NoopLoggingProvider.INSTANCE,
+                domainNameResolver,
+                RoutingContext.EMPTY,
+                mock(BoltAgent.class),
+                "userAgent",
+                0);
 
         var addresses = rediscovery.resolve();
 
@@ -676,7 +695,9 @@ class RediscoveryTest {
         given(domainNameResolver.resolve(initialRouter.host())).willReturn(new InetAddress[] {address});
         var table = routingTableMock(true);
         var pool = mock(BoltConnectionProvider.class);
-        given(pool.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        given(pool.connect(
+                        any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(),
+                        any(), any()))
                 .willReturn(failedFuture(new BoltServiceUnavailableException("not available")));
         var logging = mock(LoggingProvider.class);
         var logger = mock(System.Logger.class);
@@ -684,7 +705,15 @@ class RediscoveryTest {
         doAnswer(invocationOnMock -> String.format(invocationOnMock.getArgument(0), invocationOnMock.getArgument(1)))
                 .when(logger)
                 .log(eq(System.Logger.Level.WARNING), anyString());
-        var rediscovery = new RediscoveryImpl(initialRouter, resolver, logging, domainNameResolver);
+        var rediscovery = new RediscoveryImpl(
+                initialRouter,
+                resolver,
+                logging,
+                domainNameResolver,
+                RoutingContext.EMPTY,
+                mock(BoltAgent.class),
+                "userAgent",
+                0);
 
         // WHEN & THEN
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
@@ -712,7 +741,15 @@ class RediscoveryTest {
             BoltServerAddress initialRouter,
             Function<BoltServerAddress, Set<BoltServerAddress>> resolver,
             LoggingProvider loggingProvider) {
-        return new RediscoveryImpl(initialRouter, resolver, loggingProvider, DefaultDomainNameResolver.getInstance());
+        return new RediscoveryImpl(
+                initialRouter,
+                resolver,
+                loggingProvider,
+                DefaultDomainNameResolver.getInstance(),
+                RoutingContext.EMPTY,
+                mock(BoltAgent.class),
+                "userAgent",
+                0);
     }
 
     private Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter(
@@ -722,7 +759,9 @@ class RediscoveryTest {
             var boltConnection = setupConnection(entry.getValue());
 
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
-            given(boltConnectionProvider.connect(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            given(boltConnectionProvider.connect(
+                            any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(),
+                            any(), any(), any()))
                     .willReturn(completedFuture(boltConnection));
 
             addressToProvider.put(entry.getKey(), boltConnectionProvider);

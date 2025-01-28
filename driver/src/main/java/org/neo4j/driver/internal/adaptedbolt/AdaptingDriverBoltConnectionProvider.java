@@ -30,7 +30,6 @@ import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
@@ -41,28 +40,31 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
     private final ErrorMapper errorMapper;
     private final BoltValueFactory boltValueFactory;
     private final boolean routed;
+    private final BoltServerAddress address;
+    private final RoutingContext routingContext;
+    private final BoltAgent boltAgent;
+    private final String userAgent;
+    private final int connectTimeoutMillis;
 
     public AdaptingDriverBoltConnectionProvider(
             BoltConnectionProvider delegate,
             ErrorMapper errorMapper,
             BoltValueFactory boltValueFactory,
-            boolean routed) {
-        this.delegate = Objects.requireNonNull(delegate);
-        this.errorMapper = Objects.requireNonNull(errorMapper);
-        this.boltValueFactory = Objects.requireNonNull(boltValueFactory);
-        this.routed = routed;
-    }
-
-    @Override
-    public CompletionStage<Void> init(
+            boolean routed,
             BoltServerAddress address,
             RoutingContext routingContext,
             BoltAgent boltAgent,
             String userAgent,
-            int connectTimeoutMillis,
-            MetricsListener metricsListener) {
-        return delegate.init(address, routingContext, boltAgent, userAgent, connectTimeoutMillis, metricsListener)
-                .exceptionally(errorMapper::mapAndTrow);
+            int connectTimeoutMillis) {
+        this.delegate = Objects.requireNonNull(delegate);
+        this.errorMapper = Objects.requireNonNull(errorMapper);
+        this.boltValueFactory = Objects.requireNonNull(boltValueFactory);
+        this.routed = routed;
+        this.address = Objects.requireNonNull(address);
+        this.routingContext = Objects.requireNonNull(routingContext);
+        this.boltAgent = Objects.requireNonNull(boltAgent);
+        this.userAgent = Objects.requireNonNull(userAgent);
+        this.connectTimeoutMillis = connectTimeoutMillis;
     }
 
     @Override
@@ -78,6 +80,11 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
             Consumer<DatabaseName> databaseNameConsumer,
             Map<String, Object> additionalParameters) {
         return delegate.connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         databaseName,
                         () -> authMapStageSupplier
@@ -99,19 +106,40 @@ public class AdaptingDriverBoltConnectionProvider implements DriverBoltConnectio
 
     @Override
     public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.verifyConnectivity(securityPlan, AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
+        return delegate.verifyConnectivity(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
+                        securityPlan,
+                        AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
                 .exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override
     public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsMultiDb(securityPlan, AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
+        return delegate.supportsMultiDb(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
+                        securityPlan,
+                        AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
                 .exceptionally(errorMapper::mapAndTrow);
     }
 
     @Override
     public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsSessionAuth(securityPlan, AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
+        return delegate.supportsSessionAuth(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
+                        securityPlan,
+                        AuthTokens.custom(boltValueFactory.toBoltMap(authMap)))
                 .exceptionally(errorMapper::mapAndTrow);
     }
 

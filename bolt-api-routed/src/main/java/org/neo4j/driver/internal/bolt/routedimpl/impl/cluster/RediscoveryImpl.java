@@ -37,6 +37,7 @@ import java.util.function.Supplier;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
 import org.neo4j.driver.internal.bolt.api.AuthToken;
+import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -45,6 +46,7 @@ import org.neo4j.driver.internal.bolt.api.ClusterComposition;
 import org.neo4j.driver.internal.bolt.api.DomainNameResolver;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
+import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.BoltDiscoveryException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
@@ -78,16 +80,28 @@ public class RediscoveryImpl implements Rediscovery {
     private final System.Logger log;
     private final Function<BoltServerAddress, Set<BoltServerAddress>> resolver;
     private final DomainNameResolver domainNameResolver;
+    private final RoutingContext routingContext;
+    private final BoltAgent boltAgent;
+    private final String userAgent;
+    private final int connectTimeoutMillis;
 
     public RediscoveryImpl(
             BoltServerAddress initialRouter,
             Function<BoltServerAddress, Set<BoltServerAddress>> resolver,
             LoggingProvider logging,
-            DomainNameResolver domainNameResolver) {
+            DomainNameResolver domainNameResolver,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis) {
         this.initialRouter = initialRouter;
         this.log = logging.getLog(getClass());
         this.resolver = resolver;
         this.domainNameResolver = requireNonNull(domainNameResolver);
+        this.routingContext = routingContext;
+        this.boltAgent = boltAgent;
+        this.userAgent = userAgent;
+        this.connectTimeoutMillis = connectTimeoutMillis;
     }
 
     @Override
@@ -360,6 +374,11 @@ public class RediscoveryImpl implements Rediscovery {
                 .thenCompose(address -> connectionProviderGetter
                         .apply(address)
                         .connect(
+                                address,
+                                routingContext,
+                                boltAgent,
+                                userAgent,
+                                connectTimeoutMillis,
                                 securityPlan,
                                 null,
                                 authTokenStageSupplier,

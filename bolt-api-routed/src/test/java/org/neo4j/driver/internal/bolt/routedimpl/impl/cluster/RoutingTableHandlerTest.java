@@ -253,7 +253,21 @@ class RoutingTableHandlerTest {
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
             var connection = mock(BoltConnection.class);
             given(boltConnectionProvider.connect(
-                            any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            Collections.emptyMap()))
                     .willReturn(completedFuture(connection));
             return boltConnectionProvider;
         };
@@ -283,7 +297,21 @@ class RoutingTableHandlerTest {
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
             var connection = mock(BoltConnection.class);
             given(boltConnectionProvider.connect(
-                            any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            Collections.emptyMap()))
                     .willReturn(completedFuture(connection));
             return boltConnectionProvider;
         };
@@ -344,7 +372,21 @@ class RoutingTableHandlerTest {
             var boltConnectionProvider = mock(BoltConnectionProvider.class);
             if (unavailableAddresses.contains(requestedAddress)) {
                 given(boltConnectionProvider.connect(
-                                any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                any(),
+                                Collections.emptyMap()))
                         .willReturn(CompletableFuture.failedFuture(
                                 new BoltServiceUnavailableException(requestedAddress + " is unavailable!")));
                 return boltConnectionProvider;
@@ -352,7 +394,21 @@ class RoutingTableHandlerTest {
             var connection = mock(BoltConnection.class);
             when(connection.serverAddress()).thenReturn(requestedAddress);
             given(boltConnectionProvider.connect(
-                            any(), any(), any(), any(), any(), any(), any(), any(), any(), Collections.emptyMap()))
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            Collections.emptyMap()))
                     .willReturn(completedFuture(connection));
             return boltConnectionProvider;
         };

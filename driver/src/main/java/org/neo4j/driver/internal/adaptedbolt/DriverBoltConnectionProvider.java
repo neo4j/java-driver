@@ -23,24 +23,12 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
-import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
-import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 
 public interface DriverBoltConnectionProvider {
-    @SuppressWarnings("UnusedReturnValue")
-    CompletionStage<Void> init(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            MetricsListener metricsListener);
 
     CompletionStage<DriverBoltConnection> connect(
             SecurityPlan securityPlan,

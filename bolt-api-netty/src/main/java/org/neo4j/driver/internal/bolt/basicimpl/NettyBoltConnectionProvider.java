@@ -58,19 +58,12 @@ import org.neo4j.driver.internal.bolt.basicimpl.impl.util.FutureUtil;
 public final class NettyBoltConnectionProvider implements BoltConnectionProvider {
     private final LoggingProvider logging;
     private final System.Logger log;
-
     private final ConnectionProvider connectionProvider;
-
-    private BoltServerAddress address;
-
-    private RoutingContext routingContext;
-    private BoltAgent boltAgent;
-    private String userAgent;
-    private int connectTimeoutMillis;
-    private CompletableFuture<Void> closeFuture;
-    private MetricsListener metricsListener;
+    private final MetricsListener metricsListener;
     private final Clock clock;
     private final ValueFactory valueFactory;
+
+    private CompletableFuture<Void> closeFuture;
 
     public NettyBoltConnectionProvider(
             EventLoopGroup eventLoopGroup,
@@ -78,7 +71,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             DomainNameResolver domainNameResolver,
             LocalAddress localAddress,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            MetricsListener metricsListener) {
         Objects.requireNonNull(eventLoopGroup);
         this.clock = Objects.requireNonNull(clock);
         this.logging = Objects.requireNonNull(logging);
@@ -86,28 +80,17 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         this.connectionProvider = ConnectionProviders.netty(
                 eventLoopGroup, clock, domainNameResolver, localAddress, logging, valueFactory);
         this.valueFactory = Objects.requireNonNull(valueFactory);
+        this.metricsListener = NoopMetricsListener.getInstance();
+        InternalLoggerFactory.setDefaultFactory(new NettyLogging(logging));
     }
 
     @Override
-    public CompletionStage<Void> init(
+    public CompletionStage<BoltConnection> connect(
             BoltServerAddress address,
             RoutingContext routingContext,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
-            MetricsListener metricsListener) {
-        this.address = address;
-        this.routingContext = routingContext;
-        this.boltAgent = boltAgent;
-        this.userAgent = userAgent;
-        this.connectTimeoutMillis = connectTimeoutMillis;
-        this.metricsListener = NoopMetricsListener.getInstance();
-        InternalLoggerFactory.setDefaultFactory(new NettyLogging(logging));
-        return CompletableFuture.completedStage(null);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
             Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
@@ -180,8 +163,20 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Void> verifyConnectivity(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         null,
                         () -> CompletableFuture.completedStage(authToken),
@@ -196,8 +191,20 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Boolean> supportsMultiDb(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         null,
                         () -> CompletableFuture.completedStage(authToken),
@@ -215,8 +222,20 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Boolean> supportsSessionAuth(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         null,
                         () -> CompletableFuture.completedStage(authToken),
