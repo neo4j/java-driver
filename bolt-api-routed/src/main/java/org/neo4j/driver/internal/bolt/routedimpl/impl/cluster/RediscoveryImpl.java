@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -37,6 +36,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -53,7 +53,6 @@ import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableExcept
 import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.summary.RouteSummary;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.routedimpl.ClusterCompositionLookupResult;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutingTable;
@@ -98,7 +97,7 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion) {
         var result = new CompletableFuture<ClusterCompositionLookupResult>();
         // if we failed discovery, we will chain all errors into this one.
@@ -111,7 +110,7 @@ public class RediscoveryImpl implements Rediscovery {
                 result,
                 bookmarks,
                 impersonatedUser,
-                authMapStageSupplier,
+                authTokenStageSupplier,
                 minVersion,
                 baseError);
         return result;
@@ -124,7 +123,7 @@ public class RediscoveryImpl implements Rediscovery {
             CompletableFuture<ClusterCompositionLookupResult> result,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplierp,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             Throwable baseError) {
         lookup(
@@ -133,7 +132,7 @@ public class RediscoveryImpl implements Rediscovery {
                         connectionProviderGetter,
                         bookmarks,
                         impersonatedUser,
-                        authMapStageSupplierp,
+                        authTokenStageSupplier,
                         minVersion,
                         baseError)
                 .whenComplete((compositionLookupResult, completionError) -> {
@@ -154,7 +153,7 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             Throwable baseError) {
         CompletionStage<ClusterCompositionLookupResult> compositionStage;
@@ -166,7 +165,7 @@ public class RediscoveryImpl implements Rediscovery {
                     connectionProviderGetter,
                     bookmarks,
                     impersonatedUser,
-                    authMapStageSupplier,
+                    authTokenStageSupplier,
                     minVersion,
                     baseError);
         } else {
@@ -176,7 +175,7 @@ public class RediscoveryImpl implements Rediscovery {
                     connectionProviderGetter,
                     bookmarks,
                     impersonatedUser,
-                    authMapStageSupplier,
+                    authTokenStageSupplier,
                     minVersion,
                     baseError);
         }
@@ -190,7 +189,7 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             Throwable baseError) {
         Set<BoltServerAddress> seenServers = new HashSet<>();
@@ -201,7 +200,7 @@ public class RediscoveryImpl implements Rediscovery {
                         seenServers,
                         bookmarks,
                         impersonatedUser,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         minVersion,
                         baseError)
                 .thenCompose(compositionLookupResult -> {
@@ -215,7 +214,7 @@ public class RediscoveryImpl implements Rediscovery {
                             seenServers,
                             bookmarks,
                             impersonatedUser,
-                            authMapStageSupplier,
+                            authTokenStageSupplier,
                             minVersion,
                             baseError);
                 });
@@ -227,7 +226,7 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             Throwable baseError) {
         Set<BoltServerAddress> seenServers = emptySet();
@@ -238,7 +237,7 @@ public class RediscoveryImpl implements Rediscovery {
                         seenServers,
                         bookmarks,
                         impersonatedUser,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         minVersion,
                         baseError)
                 .thenCompose(compositionLookupResult -> {
@@ -252,7 +251,7 @@ public class RediscoveryImpl implements Rediscovery {
                             new HashSet<>(),
                             bookmarks,
                             impersonatedUser,
-                            authMapStageSupplier,
+                            authTokenStageSupplier,
                             minVersion,
                             baseError);
                 });
@@ -265,7 +264,7 @@ public class RediscoveryImpl implements Rediscovery {
             Set<BoltServerAddress> seenServers,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             Throwable baseError) {
         CompletableFuture<ClusterComposition> result = CompletableFuture.completedFuture(null);
@@ -283,7 +282,7 @@ public class RediscoveryImpl implements Rediscovery {
                             seenServers,
                             bookmarks,
                             impersonatedUser,
-                            authMapStageSupplier,
+                            authTokenStageSupplier,
                             minVersion,
                             baseError);
                 }
@@ -300,7 +299,7 @@ public class RediscoveryImpl implements Rediscovery {
             Set<BoltServerAddress> seenServers,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             Throwable baseError) {
         List<BoltServerAddress> resolvedRouters;
@@ -327,7 +326,7 @@ public class RediscoveryImpl implements Rediscovery {
                         null,
                         bookmarks,
                         impersonatedUser,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         minVersion,
                         baseError);
             });
@@ -345,7 +344,7 @@ public class RediscoveryImpl implements Rediscovery {
             Set<BoltServerAddress> seenServers,
             Set<String> bookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             Throwable baseError) {
         var addressFuture = CompletableFuture.completedFuture(routerAddress);
@@ -363,7 +362,7 @@ public class RediscoveryImpl implements Rediscovery {
                         .connect(
                                 securityPlan,
                                 null,
-                                authMapStageSupplier,
+                                authTokenStageSupplier,
                                 AccessMode.READ,
                                 bookmarks,
                                 null,

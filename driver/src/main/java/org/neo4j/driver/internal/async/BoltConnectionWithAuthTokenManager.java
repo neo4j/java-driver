@@ -41,10 +41,11 @@ final class BoltConnectionWithAuthTokenManager extends DelegatingBoltConnection 
 
     private Throwable mapSecurityError(Throwable throwable) {
         if (throwable instanceof SecurityException securityException) {
-            var authData = delegate.authData().toCompletableFuture().getNow(null);
-            if (authData != null
+            var authInfo = delegate.authData().toCompletableFuture().getNow(null);
+            if (authInfo != null
                     && authTokenManager.handleSecurityException(
-                            new InternalAuthToken(BoltValueFactory.getInstance().toDriverMap(authData.authMap())),
+                            new InternalAuthToken(BoltValueFactory.getInstance()
+                                    .toDriverMap(authInfo.authToken().asMap())),
                             securityException)) {
                 throwable = new SecurityRetryableException(securityException);
             }

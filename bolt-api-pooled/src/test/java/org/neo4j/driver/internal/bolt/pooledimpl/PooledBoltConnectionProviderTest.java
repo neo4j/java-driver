@@ -48,7 +48,9 @@ import org.mockito.BDDMockito;
 import org.mockito.Mock;
 import org.mockito.stubbing.Answer;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import org.neo4j.driver.internal.bolt.api.AuthInfo;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
+import org.neo4j.driver.internal.bolt.api.AuthTokens;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -90,7 +92,7 @@ class PooledBoltConnectionProviderTest {
     BoltConnection connection;
 
     @Mock
-    Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier;
+    Supplier<CompletionStage<AuthToken>> authTokenStageSupplier;
 
     final int maxSize = 2;
     final long acquisitionTimeout = 5000;
@@ -114,7 +116,8 @@ class PooledBoltConnectionProviderTest {
     void beforeEach() {
         openMocks(this);
         given(loggingProvider.getLog(any(Class.class))).willReturn(mock(System.Logger.class));
-        given(authMapStageSupplier.get()).willReturn(CompletableFuture.completedStage(Map.of()));
+        given(authTokenStageSupplier.get())
+                .willReturn(CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())));
         provider = new PooledBoltConnectionProvider(
                 upstreamProvider, maxSize, acquisitionTimeout, maxLifetime, idleBeforeTest, clock, loggingProvider);
         provider.init(address, context, boltAgent, userAgent, timeout, metricsListener);
@@ -146,7 +149,7 @@ class PooledBoltConnectionProviderTest {
         var connection = provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -199,7 +202,7 @@ class PooledBoltConnectionProviderTest {
         provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -214,7 +217,7 @@ class PooledBoltConnectionProviderTest {
         var connectionStage = provider.connect(
                 securityPlan,
                 databaseName,
-                authMapStageSupplier,
+                authTokenStageSupplier,
                 mode,
                 bookmarks,
                 null,
@@ -255,7 +258,7 @@ class PooledBoltConnectionProviderTest {
         var connection = provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -286,10 +289,10 @@ class PooledBoltConnectionProviderTest {
         });
         given(connection.state()).willReturn(BoltConnectionState.OPEN);
         given(connection.protocolVersion()).willReturn(minVersion);
-        var authData = mock(AuthData.class);
-        given(authData.authAckMillis()).willReturn(0L);
-        given(authData.authMap()).willReturn(Collections.emptyMap());
-        given(connection.authData()).willReturn(CompletableFuture.completedStage(authData));
+        var authInfo = mock(AuthInfo.class);
+        given(authInfo.authAckMillis()).willReturn(0L);
+        given(authInfo.authToken()).willReturn(AuthTokens.custom(Collections.emptyMap()));
+        given(connection.authInfo()).willReturn(CompletableFuture.completedStage(authInfo));
         given(upstreamProvider.connect(
                         eq(securityPlan),
                         eq(databaseName),
@@ -305,7 +308,7 @@ class PooledBoltConnectionProviderTest {
         provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -324,7 +327,7 @@ class PooledBoltConnectionProviderTest {
         var connection = provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -371,7 +374,7 @@ class PooledBoltConnectionProviderTest {
         provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -417,7 +420,7 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(connection));
 
         // when
-        provider.verifyConnectivity(SecurityPlan.INSECURE, Collections.emptyMap())
+        provider.verifyConnectivity(SecurityPlan.INSECURE, AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
 
@@ -465,7 +468,7 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(connection));
 
         // when
-        var supports = provider.supportsMultiDb(SecurityPlan.INSECURE, Collections.emptyMap())
+        var supports = provider.supportsMultiDb(SecurityPlan.INSECURE, AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
 
@@ -520,7 +523,7 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(connection));
 
         // when
-        var supports = provider.supportsSessionAuth(SecurityPlan.INSECURE, Collections.emptyMap())
+        var supports = provider.supportsSessionAuth(SecurityPlan.INSECURE, AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
 
@@ -576,7 +579,7 @@ class PooledBoltConnectionProviderTest {
         provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -594,7 +597,7 @@ class PooledBoltConnectionProviderTest {
         var future = provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -638,7 +641,7 @@ class PooledBoltConnectionProviderTest {
         provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -657,7 +660,7 @@ class PooledBoltConnectionProviderTest {
         var anotherConnection = provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -687,10 +690,10 @@ class PooledBoltConnectionProviderTest {
             handler.onComplete();
             return CompletableFuture.completedStage(null);
         });
-        var authData = mock(AuthData.class);
-        given(authData.authAckMillis()).willReturn(0L);
-        given(authData.authMap()).willReturn(Collections.emptyMap());
-        given(connection.authData()).willReturn(CompletableFuture.completedStage(authData));
+        var authInfo = mock(AuthInfo.class);
+        given(authInfo.authAckMillis()).willReturn(0L);
+        given(authInfo.authToken()).willReturn(AuthTokens.custom(Collections.emptyMap()));
+        given(connection.authInfo()).willReturn(CompletableFuture.completedStage(authInfo));
         given(upstreamProvider.connect(
                         eq(securityPlan),
                         eq(databaseName),
@@ -706,7 +709,7 @@ class PooledBoltConnectionProviderTest {
         provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -725,7 +728,7 @@ class PooledBoltConnectionProviderTest {
         var actualConnection = provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -756,14 +759,15 @@ class PooledBoltConnectionProviderTest {
         });
         given(connection.logoff()).willReturn(CompletableFuture.completedStage(connection));
         var authMap = Map.of("key", mock(Value.class));
-        given(connection.logon(authMap)).willReturn(CompletableFuture.completedStage(connection));
-        var authData = mock(AuthData.class);
-        given(authData.authAckMillis()).willReturn(0L);
-        given(authData.authMap()).willReturn(Collections.emptyMap());
-        given(connection.authData()).willReturn(CompletableFuture.completedStage(authData));
-        given(authMapStageSupplier.get())
-                .willReturn(CompletableFuture.completedStage(Collections.emptyMap()))
-                .willReturn(CompletableFuture.completedStage(authMap));
+        var authToken = AuthTokens.custom(authMap);
+        given(connection.logon(authToken)).willReturn(CompletableFuture.completedStage(connection));
+        var authInfo = mock(AuthInfo.class);
+        given(authInfo.authAckMillis()).willReturn(0L);
+        given(authInfo.authToken()).willReturn(AuthTokens.custom(Collections.emptyMap()));
+        given(connection.authInfo()).willReturn(CompletableFuture.completedStage(authInfo));
+        given(authTokenStageSupplier.get())
+                .willReturn(CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())))
+                .willReturn(CompletableFuture.completedStage(authToken));
         given(upstreamProvider.connect(
                         eq(securityPlan),
                         eq(databaseName),
@@ -779,7 +783,7 @@ class PooledBoltConnectionProviderTest {
         provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -797,7 +801,7 @@ class PooledBoltConnectionProviderTest {
         var actualConnection = provider.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         null,
@@ -811,6 +815,6 @@ class PooledBoltConnectionProviderTest {
         // then
         assertEquals(connection, ((PooledBoltConnection) actualConnection).delegate());
         then(connection).should().logoff();
-        then(connection).should().logon(authMap);
+        then(connection).should().logon(authToken);
     }
 }

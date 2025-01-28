@@ -34,6 +34,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
@@ -41,7 +42,6 @@ import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.DatabaseNameUtil;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.impl.util.FutureUtil;
 
@@ -102,7 +102,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
             AccessMode mode,
             Set<String> rediscoveryBookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             String homeDatabaseHint) {
         if (!databaseNameFuture.isDone()) {
@@ -119,7 +119,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
                         mode,
                         rediscoveryBookmarks,
                         impersonatedUser,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         minVersion)
                 .thenCompose(ctxAndHandler -> {
                     var handler = ctxAndHandler.handler() != null
@@ -127,7 +127,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
                             : getOrCreate(FutureUtil.joinNowOrElseThrow(
                                     ctxAndHandler.databaseNameFuture(), PENDING_DATABASE_NAME_EXCEPTION_SUPPLIER));
                     return handler.ensureRoutingTable(
-                                    securityPlan, mode, rediscoveryBookmarks, authMapStageSupplier, minVersion)
+                                    securityPlan, mode, rediscoveryBookmarks, authTokenStageSupplier, minVersion)
                             .thenApply(ignored -> handler);
                 });
     }
@@ -138,7 +138,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
             AccessMode mode,
             Set<String> rediscoveryBookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion) {
         CompletionStage<ConnectionContextAndHandler> contextAndHandlerStage;
 
@@ -168,7 +168,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
                                         connectionProviderGetter,
                                         rediscoveryBookmarks,
                                         impersonatedUser,
-                                        authMapStageSupplier,
+                                        authTokenStageSupplier,
                                         minVersion)
                                 .thenCompose(compositionLookupResult -> {
                                     var databaseName = DatabaseNameUtil.database(compositionLookupResult

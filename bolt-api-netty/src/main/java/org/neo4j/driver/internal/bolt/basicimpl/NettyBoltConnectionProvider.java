@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -44,7 +45,6 @@ import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 import org.neo4j.driver.internal.bolt.api.values.ValueFactory;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.BoltConnectionImpl;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.ConnectionProvider;
@@ -110,7 +110,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     public CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             AccessMode mode,
             Set<String> bookmarks,
             String impersonatedUser,
@@ -125,17 +125,17 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         }
 
         var latestAuthMillisFuture = new CompletableFuture<Long>();
-        var authMapRef = new AtomicReference<Map<String, Value>>();
-        return authMapStageSupplier
+        var authMapRef = new AtomicReference<AuthToken>();
+        return authTokenStageSupplier
                 .get()
-                .thenCompose(authMap -> {
-                    authMapRef.set(authMap);
+                .thenCompose(authToken -> {
+                    authMapRef.set(authToken);
                     return this.connectionProvider.acquireConnection(
                             address,
                             securityPlan,
                             routingContext,
                             databaseName != null ? databaseName.databaseName().orElse(null) : null,
-                            authMap,
+                            authToken.asMap(),
                             boltAgent,
                             userAgent,
                             mode,
@@ -180,11 +180,11 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
         return connect(
                         securityPlan,
                         null,
-                        () -> CompletableFuture.completedStage(authMap),
+                        () -> CompletableFuture.completedStage(authToken),
                         AccessMode.WRITE,
                         Collections.emptySet(),
                         null,
@@ -196,11 +196,11 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
         return connect(
                         securityPlan,
                         null,
-                        () -> CompletableFuture.completedStage(authMap),
+                        () -> CompletableFuture.completedStage(authToken),
                         AccessMode.WRITE,
                         Collections.emptySet(),
                         null,
@@ -215,11 +215,11 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap) {
+    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
         return connect(
                         securityPlan,
                         null,
-                        () -> CompletableFuture.completedStage(authMap),
+                        () -> CompletableFuture.completedStage(authToken),
                         AccessMode.WRITE,
                         Collections.emptySet(),
                         null,

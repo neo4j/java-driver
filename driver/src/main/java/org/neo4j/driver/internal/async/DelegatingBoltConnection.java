@@ -25,7 +25,7 @@ import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.adaptedbolt.DriverBoltConnection;
 import org.neo4j.driver.internal.adaptedbolt.DriverResponseHandler;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import org.neo4j.driver.internal.bolt.api.AuthInfo;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
@@ -171,7 +171,7 @@ public abstract class DelegatingBoltConnection implements DriverBoltConnection {
     }
 
     @Override
-    public CompletionStage<AuthData> authData() {
+    public CompletionStage<AuthInfo> authData() {
         return delegate.authData();
     }
 

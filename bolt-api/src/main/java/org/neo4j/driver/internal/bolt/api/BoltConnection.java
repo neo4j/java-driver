@@ -63,7 +63,7 @@ public interface BoltConnection {
 
     CompletionStage<BoltConnection> logoff();
 
-    CompletionStage<BoltConnection> logon(Map<String, Value> authMap);
+    CompletionStage<BoltConnection> logon(AuthToken authToken);
 
     CompletionStage<BoltConnection> telemetry(TelemetryApi telemetryApi);
 
@@ -79,7 +79,7 @@ public interface BoltConnection {
 
     BoltConnectionState state();
 
-    CompletionStage<AuthData> authData();
+    CompletionStage<AuthInfo> authInfo();
 
     // ----- IMMUTABLE DATA -----
 

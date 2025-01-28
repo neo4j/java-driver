@@ -16,18 +16,17 @@
  */
 package org.neo4j.driver.internal.bolt.routedimpl.impl.cluster;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 
 /**
  * A generic interface to access all routing tables as a whole.
@@ -45,7 +44,7 @@ public interface RoutingTableRegistry {
             AccessMode mode,
             Set<String> rediscoveryBookmarks,
             String impersonatedUser,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             BoltProtocolVersion minVersion,
             String homeDatabaseHint);
 

@@ -19,8 +19,6 @@ package org.neo4j.driver.internal.bolt.api;
 import java.util.Map;
 import org.neo4j.driver.internal.bolt.api.values.Value;
 
-public interface AuthData {
-    Map<String, Value> authMap();
-
-    long authAckMillis();
+public sealed interface AuthToken permits AuthTokenImpl {
+    Map<String, Value> asMap();
 }

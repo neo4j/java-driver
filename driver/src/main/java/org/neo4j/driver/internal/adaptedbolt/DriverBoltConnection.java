@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.Value;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import org.neo4j.driver.internal.bolt.api.AuthInfo;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
@@ -89,7 +89,7 @@ public interface DriverBoltConnection {
 
     BoltConnectionState state();
 
-    CompletionStage<AuthData> authData();
+    CompletionStage<AuthInfo> authData();
 
     // ----- IMMUTABLE DATA -----
 

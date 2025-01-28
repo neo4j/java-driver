@@ -23,6 +23,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltAgent;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
@@ -33,7 +34,6 @@ import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
-import org.neo4j.driver.internal.bolt.api.values.Value;
 
 final class ListeningBoltConnectionProvider implements BoltConnectionProvider {
     private final BoltConnectionProvider delegate;
@@ -60,7 +60,7 @@ final class ListeningBoltConnectionProvider implements BoltConnectionProvider {
     public CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
-            Supplier<CompletionStage<Map<String, Value>>> authMapStageSupplier,
+            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             AccessMode mode,
             Set<String> bookmarks,
             String impersonatedUser,
@@ -71,7 +71,7 @@ final class ListeningBoltConnectionProvider implements BoltConnectionProvider {
         return delegate.connect(
                         securityPlan,
                         databaseName,
-                        authMapStageSupplier,
+                        authTokenStageSupplier,
                         mode,
                         bookmarks,
                         impersonatedUser,
@@ -87,18 +87,18 @@ final class ListeningBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.verifyConnectivity(securityPlan, authMap);
+    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
+        return delegate.verifyConnectivity(securityPlan, authToken);
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsMultiDb(securityPlan, authMap);
+    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
+        return delegate.supportsMultiDb(securityPlan, authToken);
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, Map<String, Value> authMap) {
-        return delegate.supportsSessionAuth(securityPlan, authMap);
+    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
+        return delegate.supportsSessionAuth(securityPlan, authToken);
     }
 
     @Override

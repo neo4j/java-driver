@@ -22,7 +22,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
-import org.neo4j.driver.internal.bolt.api.AuthData;
+import org.neo4j.driver.internal.bolt.api.AuthInfo;
+import org.neo4j.driver.internal.bolt.api.AuthToken;
 import org.neo4j.driver.internal.bolt.api.BoltConnection;
 import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
@@ -138,8 +139,8 @@ final class ListeningBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<BoltConnection> logon(Map<String, Value> authMap) {
-        return delegate.logon(authMap).thenApply(ignored -> this);
+    public CompletionStage<BoltConnection> logon(AuthToken authToken) {
+        return delegate.logon(authToken).thenApply(ignored -> this);
     }
 
     @Override
@@ -173,8 +174,8 @@ final class ListeningBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<AuthData> authData() {
-        return delegate.authData();
+    public CompletionStage<AuthInfo> authInfo() {
+        return delegate.authInfo();
     }
 
     @Override
