@@ -69,72 +69,64 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             "Failed to obtain connection towards %s server. Known routing table is: %s";
     private static final String CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE =
             "Failed to obtain a connection towards address %s, will try other addresses if available. Complete failure is reported separately from this entry.";
-    private final LoggingProvider logging;
     private final System.Logger log;
-    private final Supplier<BoltConnectionProvider> boltConnectionProviderSupplier;
-
+    private final Function<BoltServerAddress, BoltConnectionProvider> boltConnectionProviderFunction;
     private final Map<BoltServerAddress, BoltConnectionProvider> addressToProvider = new HashMap<>();
-    private final Function<BoltServerAddress, Set<BoltServerAddress>> resolver;
-    private final DomainNameResolver domainNameResolver;
     private final Map<BoltServerAddress, Integer> addressToInUseCount = new HashMap<>();
-
     private final LoadBalancingStrategy loadBalancingStrategy;
-    private final long routingTablePurgeDelayMs;
+    private final RoutingTableRegistry registry;
+    private final RoutingContext routingContext;
+    private final BoltAgent boltAgent;
+    private final String userAgent;
+    private final int connectTimeoutMillis;
 
     private Rediscovery rediscovery;
-    private RoutingTableRegistry registry;
-
-    private RoutingContext routingContext;
-    private BoltAgent boltAgent;
-    private String userAgent;
-    private int connectTimeoutMillis;
     private CompletableFuture<Void> closeFuture;
-    private final Clock clock;
-    private MetricsListener metricsListener;
 
     public RoutedBoltConnectionProvider(
-            Supplier<BoltConnectionProvider> boltConnectionProviderSupplier,
+            Function<BoltServerAddress, BoltConnectionProvider> boltConnectionProviderFunction,
             Function<BoltServerAddress, Set<BoltServerAddress>> resolver,
             DomainNameResolver domainNameResolver,
             long routingTablePurgeDelayMs,
             Rediscovery rediscovery,
             Clock clock,
-            LoggingProvider logging) {
-        this.boltConnectionProviderSupplier = Objects.requireNonNull(boltConnectionProviderSupplier);
-        this.resolver = Objects.requireNonNull(resolver);
-        this.logging = Objects.requireNonNull(logging);
-        this.log = logging.getLog(getClass());
-        this.loadBalancingStrategy = new LeastConnectedLoadBalancingStrategy(this::getInUseCount, logging);
-        this.domainNameResolver = Objects.requireNonNull(domainNameResolver);
-        this.routingTablePurgeDelayMs = routingTablePurgeDelayMs;
-        this.rediscovery = rediscovery;
-        this.clock = Objects.requireNonNull(clock);
-    }
-
-    @Override
-    public synchronized CompletionStage<Void> init(
+            LoggingProvider logging,
             BoltServerAddress address,
             RoutingContext routingContext,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
             MetricsListener metricsListener) {
+        this.boltConnectionProviderFunction = Objects.requireNonNull(boltConnectionProviderFunction);
+        this.log = logging.getLog(getClass());
+        this.loadBalancingStrategy = new LeastConnectedLoadBalancingStrategy(this::getInUseCount, logging);
+        this.rediscovery = rediscovery;
         this.routingContext = routingContext;
         this.boltAgent = boltAgent;
         this.userAgent = userAgent;
         this.connectTimeoutMillis = connectTimeoutMillis;
         if (this.rediscovery == null) {
-            this.rediscovery = new RediscoveryImpl(address, resolver, logging, domainNameResolver);
+            this.rediscovery = new RediscoveryImpl(
+                    address,
+                    resolver,
+                    logging,
+                    domainNameResolver,
+                    routingContext,
+                    boltAgent,
+                    userAgent,
+                    connectTimeoutMillis);
         }
         this.registry = new RoutingTableRegistryImpl(
-                this::get, rediscovery, clock, logging, routingTablePurgeDelayMs, this::shutdownUnusedProviders);
-        this.metricsListener = Objects.requireNonNull(metricsListener);
-
-        return CompletableFuture.completedStage(null);
+                this::get, this.rediscovery, clock, logging, routingTablePurgeDelayMs, this::shutdownUnusedProviders);
     }
 
     @Override
     public CompletionStage<BoltConnection> connect(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
             SecurityPlan securityPlan,
             DatabaseName databaseName,
             Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
@@ -208,12 +200,19 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Void> verifyConnectivity(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         RoutingTableRegistry registry;
         synchronized (this) {
             registry = this.registry;
         }
-        return supportsMultiDb(securityPlan, authToken)
+        return supportsMultiDb(null, null, null, null, 0, securityPlan, authToken)
                 .thenCompose(supports -> registry.ensureRoutingTable(
                         securityPlan,
                         supports
@@ -240,7 +239,14 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Boolean> supportsMultiDb(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return detectFeature(
                 securityPlan,
                 authToken,
@@ -249,7 +255,14 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Boolean> supportsSessionAuth(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return detectFeature(
                 securityPlan,
                 authToken,
@@ -304,6 +317,11 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                 }
                 return get(address)
                         .connect(
+                                address,
+                                routingContext,
+                                boltAgent,
+                                userAgent,
+                                connectTimeoutMillis,
                                 securityPlan,
                                 null,
                                 () -> CompletableFuture.completedStage(authToken),
@@ -390,6 +408,11 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
 
         get(address)
                 .connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         database,
                         authTokenStageSupplier,
@@ -487,8 +510,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     private synchronized BoltConnectionProvider get(BoltServerAddress address) {
         var provider = addressToProvider.get(address);
         if (provider == null) {
-            provider = boltConnectionProviderSupplier.get();
-            provider.init(address, routingContext, boltAgent, userAgent, connectTimeoutMillis, metricsListener);
+            provider = boltConnectionProviderFunction.apply(address);
             addressToProvider.put(address, provider);
         }
         return provider;

@@ -119,20 +119,30 @@ class PooledBoltConnectionProviderTest {
         given(authTokenStageSupplier.get())
                 .willReturn(CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())));
         provider = new PooledBoltConnectionProvider(
-                upstreamProvider, maxSize, acquisitionTimeout, maxLifetime, idleBeforeTest, clock, loggingProvider);
-        provider.init(address, context, boltAgent, userAgent, timeout, metricsListener);
-    }
-
-    @Test
-    void shouldInitUpstream() {
-        // then
-        then(upstreamProvider).should().init(address, context, boltAgent, userAgent, timeout, metricsListener);
+                upstreamProvider,
+                maxSize,
+                acquisitionTimeout,
+                maxLifetime,
+                idleBeforeTest,
+                clock,
+                loggingProvider,
+                metricsListener,
+                address,
+                context,
+                boltAgent,
+                userAgent,
+                timeout);
     }
 
     @Test
     void shouldCreateNewConnection() {
         // given
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -147,6 +157,11 @@ class PooledBoltConnectionProviderTest {
 
         // when
         var connection = provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -166,6 +181,11 @@ class PooledBoltConnectionProviderTest {
         then(upstreamProvider)
                 .should()
                 .connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -185,6 +205,11 @@ class PooledBoltConnectionProviderTest {
         // given
         var acquisitionTimeout = TimeUnit.SECONDS.toMillis(1);
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -197,9 +222,25 @@ class PooledBoltConnectionProviderTest {
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider = new PooledBoltConnectionProvider(
-                upstreamProvider, 1, acquisitionTimeout, maxLifetime, idleBeforeTest, clock, loggingProvider);
-        provider.init(address, context, boltAgent, userAgent, timeout, metricsListener);
+                upstreamProvider,
+                1,
+                acquisitionTimeout,
+                maxLifetime,
+                idleBeforeTest,
+                clock,
+                loggingProvider,
+                metricsListener,
+                address,
+                context,
+                boltAgent,
+                userAgent,
+                timeout);
         provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -215,6 +256,11 @@ class PooledBoltConnectionProviderTest {
 
         // when
         var connectionStage = provider.connect(
+                address,
+                context,
+                boltAgent,
+                userAgent,
+                timeout,
                 securityPlan,
                 databaseName,
                 authTokenStageSupplier,
@@ -244,6 +290,11 @@ class PooledBoltConnectionProviderTest {
             return CompletableFuture.completedStage(null);
         });
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -256,6 +307,11 @@ class PooledBoltConnectionProviderTest {
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         var connection = provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -294,6 +350,11 @@ class PooledBoltConnectionProviderTest {
         given(authInfo.authToken()).willReturn(AuthTokens.custom(Collections.emptyMap()));
         given(connection.authInfo()).willReturn(CompletableFuture.completedStage(authInfo));
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -306,6 +367,11 @@ class PooledBoltConnectionProviderTest {
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -325,6 +391,11 @@ class PooledBoltConnectionProviderTest {
 
         // when
         var connection = provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -360,6 +431,11 @@ class PooledBoltConnectionProviderTest {
         given(connection.close()).willReturn(CompletableFuture.completedStage(null));
         given(upstreamProvider.close()).willReturn(CompletableFuture.completedStage(null));
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -372,6 +448,11 @@ class PooledBoltConnectionProviderTest {
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -407,6 +488,11 @@ class PooledBoltConnectionProviderTest {
             return CompletableFuture.completedStage(null);
         });
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(null),
                         any(),
@@ -420,7 +506,14 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(connection));
 
         // when
-        provider.verifyConnectivity(SecurityPlan.INSECURE, AuthTokens.custom(Collections.emptyMap()))
+        provider.verifyConnectivity(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
+                        SecurityPlan.INSECURE,
+                        AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
 
@@ -428,6 +521,11 @@ class PooledBoltConnectionProviderTest {
         then(upstreamProvider)
                 .should()
                 .connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(null),
                         any(),
@@ -455,6 +553,11 @@ class PooledBoltConnectionProviderTest {
             return CompletableFuture.completedStage(null);
         });
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(null),
                         any(),
@@ -468,7 +571,14 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(connection));
 
         // when
-        var supports = provider.supportsMultiDb(SecurityPlan.INSECURE, AuthTokens.custom(Collections.emptyMap()))
+        var supports = provider.supportsMultiDb(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
+                        SecurityPlan.INSECURE,
+                        AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
 
@@ -477,6 +587,11 @@ class PooledBoltConnectionProviderTest {
         then(upstreamProvider)
                 .should()
                 .connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(null),
                         any(),
@@ -510,6 +625,11 @@ class PooledBoltConnectionProviderTest {
             return CompletableFuture.completedStage(null);
         });
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(null),
                         any(),
@@ -523,7 +643,14 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(connection));
 
         // when
-        var supports = provider.supportsSessionAuth(SecurityPlan.INSECURE, AuthTokens.custom(Collections.emptyMap()))
+        var supports = provider.supportsSessionAuth(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
+                        SecurityPlan.INSECURE,
+                        AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
 
@@ -532,6 +659,11 @@ class PooledBoltConnectionProviderTest {
         then(upstreamProvider)
                 .should()
                 .connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(null),
                         any(),
@@ -565,6 +697,11 @@ class PooledBoltConnectionProviderTest {
             return CompletableFuture.completedStage(null);
         });
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -577,6 +714,11 @@ class PooledBoltConnectionProviderTest {
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -595,6 +737,11 @@ class PooledBoltConnectionProviderTest {
 
         // when
         var future = provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -626,6 +773,11 @@ class PooledBoltConnectionProviderTest {
         });
         var connection2 = mock(BoltConnection.class);
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -639,6 +791,11 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(connection))
                 .willReturn(CompletableFuture.completedStage(connection2));
         provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -658,6 +815,11 @@ class PooledBoltConnectionProviderTest {
 
         // when
         var anotherConnection = provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -695,6 +857,11 @@ class PooledBoltConnectionProviderTest {
         given(authInfo.authToken()).willReturn(AuthTokens.custom(Collections.emptyMap()));
         given(connection.authInfo()).willReturn(CompletableFuture.completedStage(authInfo));
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -707,6 +874,11 @@ class PooledBoltConnectionProviderTest {
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -726,6 +898,11 @@ class PooledBoltConnectionProviderTest {
 
         // when
         var actualConnection = provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -769,6 +946,11 @@ class PooledBoltConnectionProviderTest {
                 .willReturn(CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())))
                 .willReturn(CompletableFuture.completedStage(authToken));
         given(upstreamProvider.connect(
+                        eq(address),
+                        eq(context),
+                        eq(boltAgent),
+                        eq(userAgent),
+                        eq(timeout),
                         eq(securityPlan),
                         eq(databaseName),
                         any(),
@@ -781,6 +963,11 @@ class PooledBoltConnectionProviderTest {
                         any()))
                 .willReturn(CompletableFuture.completedStage(connection));
         provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -799,6 +986,11 @@ class PooledBoltConnectionProviderTest {
 
         // when
         var actualConnection = provider.connect(
+                        address,
+                        context,
+                        boltAgent,
+                        userAgent,
+                        timeout,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,

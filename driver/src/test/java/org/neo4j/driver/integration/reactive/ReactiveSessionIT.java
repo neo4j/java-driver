@@ -34,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -42,13 +43,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.neo4j.driver.Config;
 import org.neo4j.driver.ConnectionPoolMetrics;
+import org.neo4j.driver.Logging;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.exceptions.ServiceUnavailableException;
 import org.neo4j.driver.internal.util.EnabledOnNeo4jWith;
 import org.neo4j.driver.reactive.ReactiveResult;
 import org.neo4j.driver.reactive.ReactiveSession;
 import org.neo4j.driver.testutil.DatabaseExtension;
-import org.neo4j.driver.testutil.LoggingUtil;
 import org.neo4j.driver.testutil.ParallelizableIT;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
@@ -85,7 +86,7 @@ class ReactiveSessionIT {
         var messages = Collections.synchronizedList(new ArrayList<String>());
         var config = Config.builder()
                 .withDriverMetrics()
-                .withLogging(LoggingUtil.boltLogging(messages))
+                .withLogging(Logging.console(Level.FINE))
                 .build();
         try (var driver = neo4j.customDriver(config)) {
             // verify the database is available as runs may not report errors due to the subscription cancellation

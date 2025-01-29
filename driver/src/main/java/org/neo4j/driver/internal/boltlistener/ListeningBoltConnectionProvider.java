@@ -30,7 +30,6 @@ import org.neo4j.driver.internal.bolt.api.BoltConnectionProvider;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
@@ -46,18 +45,12 @@ final class ListeningBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> init(
+    public CompletionStage<BoltConnection> connect(
             BoltServerAddress address,
             RoutingContext routingContext,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
-            MetricsListener metricsListener) {
-        return delegate.init(address, routingContext, boltAgent, userAgent, connectTimeoutMillis, metricsListener);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
             Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
@@ -69,6 +62,11 @@ final class ListeningBoltConnectionProvider implements BoltConnectionProvider {
             Consumer<DatabaseName> databaseNameConsumer,
             Map<String, Object> additionalParameters) {
         return delegate.connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         databaseName,
                         authTokenStageSupplier,
@@ -87,18 +85,42 @@ final class ListeningBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
-        return delegate.verifyConnectivity(securityPlan, authToken);
+    public CompletionStage<Void> verifyConnectivity(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
+        return delegate.verifyConnectivity(
+                address, routingContext, boltAgent, userAgent, connectTimeoutMillis, securityPlan, authToken);
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
-        return delegate.supportsMultiDb(securityPlan, authToken);
+    public CompletionStage<Boolean> supportsMultiDb(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
+        return delegate.supportsMultiDb(
+                address, routingContext, boltAgent, userAgent, connectTimeoutMillis, securityPlan, authToken);
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
-        return delegate.supportsSessionAuth(securityPlan, authToken);
+    public CompletionStage<Boolean> supportsSessionAuth(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
+        return delegate.supportsSessionAuth(
+                address, routingContext, boltAgent, userAgent, connectTimeoutMillis, securityPlan, authToken);
     }
 
     @Override

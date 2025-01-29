@@ -23,15 +23,12 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public interface BoltConnectionProvider {
-    CompletionStage<Void> init(
+    CompletionStage<BoltConnection> connect(
             BoltServerAddress address,
             RoutingContext routingContext,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
-            MetricsListener metricsListener);
-
-    CompletionStage<BoltConnection> connect(
             SecurityPlan securityPlan,
             DatabaseName databaseName,
             Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
@@ -43,11 +40,32 @@ public interface BoltConnectionProvider {
             Consumer<DatabaseName> databaseNameConsumer,
             Map<String, Object> additionalParameters);
 
-    CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken);
+    CompletionStage<Void> verifyConnectivity(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken);
 
-    CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken);
+    CompletionStage<Boolean> supportsMultiDb(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken);
 
-    CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken);
+    CompletionStage<Boolean> supportsSessionAuth(
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken);
 
     CompletionStage<Void> close();
 }

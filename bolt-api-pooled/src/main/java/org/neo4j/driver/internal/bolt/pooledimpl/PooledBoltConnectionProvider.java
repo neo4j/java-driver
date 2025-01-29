@@ -66,11 +66,15 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     private final long maxLifetime;
     private final long idleBeforeTest;
     private final Clock clock;
-    private MetricsListener metricsListener;
-    private CompletionStage<Void> closeStage;
-    private BoltServerAddress address;
-    private String poolId;
+    private final MetricsListener metricsListener;
+    private final BoltServerAddress address;
+    private final RoutingContext routingContext;
+    private final BoltAgent boltAgent;
+    private final String userAgent;
+    private final int connectTimeoutMillis;
+    private final String poolId;
 
+    private CompletionStage<Void> closeStage;
     private long minAuthTimestamp;
 
     public PooledBoltConnectionProvider(
@@ -80,7 +84,13 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
             long maxLifetime,
             long idleBeforeTest,
             Clock clock,
-            LoggingProvider logging) {
+            LoggingProvider logging,
+            MetricsListener metricsListener,
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis) {
         this.boltConnectionProvider = boltConnectionProvider;
         this.pooledConnectionEntries = new ArrayList<>();
         this.pendingAcquisitions = new ArrayDeque<>(100);
@@ -90,19 +100,13 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
         this.idleBeforeTest = idleBeforeTest;
         this.clock = Objects.requireNonNull(clock);
         this.log = logging.getLog(getClass());
-    }
-
-    @Override
-    public CompletionStage<Void> init(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            MetricsListener metricsListener) {
-        this.address = Objects.requireNonNull(address);
-        this.poolId = poolId(address);
         this.metricsListener = Objects.requireNonNull(metricsListener);
+        this.address = Objects.requireNonNull(address);
+        this.routingContext = Objects.requireNonNull(routingContext);
+        this.boltAgent = Objects.requireNonNull(boltAgent);
+        this.userAgent = Objects.requireNonNull(userAgent);
+        this.connectTimeoutMillis = connectTimeoutMillis;
+        this.poolId = poolId(address);
         metricsListener.registerPoolMetrics(
                 poolId,
                 address,
@@ -120,13 +124,16 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                 .count();
                     }
                 });
-        return boltConnectionProvider.init(
-                address, routingContext, boltAgent, userAgent, connectTimeoutMillis, metricsListener);
     }
 
     @SuppressWarnings({"ReassignedVariable"})
     @Override
     public CompletionStage<BoltConnection> connect(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
             SecurityPlan securityPlan,
             DatabaseName databaseName,
             Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
@@ -334,6 +341,11 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 var entry = connectionEntryWithMetadata.connectionEntry;
                 boltConnectionProvider
                         .connect(
+                                address,
+                                routingContext,
+                                boltAgent,
+                                userAgent,
+                                connectTimeoutMillis,
                                 securityPlan,
                                 databaseName,
                                 empty.get()
@@ -502,8 +514,20 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Void> verifyConnectivity(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         null,
                         () -> CompletableFuture.completedStage(authToken),
@@ -518,8 +542,20 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Boolean> supportsMultiDb(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         null,
                         () -> CompletableFuture.completedStage(authToken),
@@ -537,8 +573,20 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(SecurityPlan securityPlan, AuthToken authToken) {
+    public CompletionStage<Boolean> supportsSessionAuth(
+            BoltServerAddress ignoredAddress,
+            RoutingContext ignoredRoutingContext,
+            BoltAgent ignoredBoltAgent,
+            String ignoredUserAgent,
+            int ignoredConnectTimeoutMillis,
+            SecurityPlan securityPlan,
+            AuthToken authToken) {
         return connect(
+                        address,
+                        routingContext,
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
                         securityPlan,
                         null,
                         () -> CompletableFuture.completedStage(authToken),
