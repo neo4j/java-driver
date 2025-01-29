@@ -43,6 +43,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.SecurityPlans;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.NoopLoggingProvider;
 
 class NettyChannelInitializerTest {
@@ -65,7 +66,7 @@ class NettyChannelInitializerTest {
 
     @Test
     void shouldNotAddSslHandlerWhenDoesNotRequireEncryption() {
-        var security = SecurityPlan.INSECURE;
+        var security = SecurityPlans.unencrypted();
         var initializer = newInitializer(security);
 
         initializer.initChannel(channel);
@@ -90,7 +91,7 @@ class NettyChannelInitializerTest {
     void shouldUpdateChannelAttributes() {
         var clock = mock(Clock.class);
         when(clock.millis()).thenReturn(42L);
-        var security = SecurityPlan.INSECURE;
+        var security = SecurityPlans.unencrypted();
         var initializer = newInitializer(security, Integer.MAX_VALUE, clock);
 
         initializer.initChannel(channel);

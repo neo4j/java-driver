@@ -14,13 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.driver.internal.util;
+package org.neo4j.driver.internal.bolt.api.ssl;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
@@ -29,50 +27,12 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.Base64;
 import java.util.List;
 
 /**
- * A tool used to save, load certs, etc.
+ * A tool used to certs.
  */
-public final class CertificateTool {
-    private static final String BEGIN_CERT = "-----BEGIN CERTIFICATE-----";
-    private static final String END_CERT = "-----END CERTIFICATE-----";
-
-    /**
-     * Save a certificate to a file. Remove all the content in the file if there is any before.
-     *
-     * @param cert the certificate
-     * @param certFile the certificate file
-     */
-    public static void saveX509Cert(Certificate cert, File certFile) throws GeneralSecurityException, IOException {
-        saveX509Cert(new Certificate[] {cert}, certFile);
-    }
-
-    /**
-     * Save a list of certificates into a file
-     *
-     * @param certs the certificates
-     * @param certFile the certificate file
-     */
-    public static void saveX509Cert(Certificate[] certs, File certFile) throws GeneralSecurityException, IOException {
-        try (var writer = new BufferedWriter(new FileWriter(certFile))) {
-            for (var cert : certs) {
-                var certStr =
-                        Base64.getEncoder().encodeToString(cert.getEncoded()).replaceAll("(.{64})", "$1\n");
-
-                writer.write(BEGIN_CERT);
-                writer.newLine();
-
-                writer.write(certStr);
-                writer.newLine();
-
-                writer.write(END_CERT);
-                writer.newLine();
-            }
-        }
-    }
-
+final class CertificateTool {
     /**
      * Load the certificates written in X.509 format in a file to a key store.
      *
@@ -114,14 +74,7 @@ public final class CertificateTool {
         }
     }
 
-    /**
-     * Load a certificate to a key store with a name
-     *
-     * @param certAlias a name to identify different certificates
-     * @param cert the certificate
-     * @param keyStore the key store
-     */
-    public static void loadX509Cert(Certificate cert, String certAlias, KeyStore keyStore) throws KeyStoreException {
+    private static void loadX509Cert(Certificate cert, String certAlias, KeyStore keyStore) throws KeyStoreException {
         keyStore.setCertificateEntry(certAlias, cert);
     }
 

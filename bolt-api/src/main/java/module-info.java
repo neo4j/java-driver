@@ -22,4 +22,5 @@ module org.neo4j.bolt.api {
     exports org.neo4j.driver.internal.bolt.api.exception;
     exports org.neo4j.driver.internal.bolt.api.summary;
     exports org.neo4j.driver.internal.bolt.api.values;
+    exports org.neo4j.driver.internal.bolt.api.ssl;
 }

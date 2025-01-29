@@ -73,7 +73,7 @@ import org.neo4j.driver.internal.bolt.api.GqlStatusError;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
-import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.SecurityPlans;
 import org.neo4j.driver.internal.bolt.api.exception.BoltFailureException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.api.exception.BoltUnsupportedFeatureException;
@@ -99,7 +99,7 @@ class RediscoveryTest {
 
         var actualComposition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -131,7 +131,7 @@ class RediscoveryTest {
 
         var actualComposition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -168,7 +168,7 @@ class RediscoveryTest {
 
         Throwable error = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -206,7 +206,7 @@ class RediscoveryTest {
 
         var actualComposition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -248,7 +248,7 @@ class RediscoveryTest {
 
         Throwable actualError = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -277,7 +277,7 @@ class RediscoveryTest {
 
         Throwable actualError = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -310,7 +310,7 @@ class RediscoveryTest {
 
         var actualComposition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -346,7 +346,7 @@ class RediscoveryTest {
 
         var actualComposition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -384,7 +384,7 @@ class RediscoveryTest {
 
         var actualComposition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -418,7 +418,7 @@ class RediscoveryTest {
 
         Throwable error = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -450,7 +450,7 @@ class RediscoveryTest {
 
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -486,7 +486,7 @@ class RediscoveryTest {
 
         var composition2 = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         emptySet(),
@@ -514,7 +514,7 @@ class RediscoveryTest {
 
         var composition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         Collections.emptySet(),
@@ -545,7 +545,7 @@ class RediscoveryTest {
 
         var composition = rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         Collections.emptySet(),
@@ -582,7 +582,7 @@ class RediscoveryTest {
 
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         Collections.emptySet(),
@@ -639,7 +639,7 @@ class RediscoveryTest {
 
         Throwable actualException = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         Collections.emptySet(),
@@ -668,7 +668,7 @@ class RediscoveryTest {
 
         Throwable actualException = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         Collections.emptySet(),
@@ -718,7 +718,7 @@ class RediscoveryTest {
         // WHEN & THEN
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
                 .lookupClusterComposition(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         table,
                         connectionProviderGetter,
                         Collections.emptySet(),
