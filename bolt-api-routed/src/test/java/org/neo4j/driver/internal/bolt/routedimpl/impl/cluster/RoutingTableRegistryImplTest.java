@@ -57,7 +57,7 @@ import org.neo4j.driver.internal.bolt.api.AuthTokens;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
-import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.SecurityPlans;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
 import org.neo4j.driver.internal.bolt.routedimpl.RoutingTable;
 import org.neo4j.driver.internal.bolt.routedimpl.impl.NoopLoggingProvider;
@@ -100,7 +100,7 @@ class RoutingTableRegistryImplTest {
         // When
         var database = database(databaseName);
         routingTables.ensureRoutingTable(
-                SecurityPlan.INSECURE,
+                SecurityPlans.unencrypted(),
                 CompletableFuture.completedFuture(database),
                 AccessMode.READ,
                 Collections.emptySet(),
@@ -131,7 +131,7 @@ class RoutingTableRegistryImplTest {
         // When
         var actual = routingTables
                 .ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         CompletableFuture.completedFuture(database),
                         AccessMode.READ,
                         Collections.emptySet(),
@@ -145,7 +145,7 @@ class RoutingTableRegistryImplTest {
         // Then it is the one we put in map that is picked up.
         verify(handler)
                 .ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         AccessMode.READ,
                         Collections.emptySet(),
                         authStageSupplier,
@@ -169,7 +169,7 @@ class RoutingTableRegistryImplTest {
         // When
         routingTables
                 .ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         CompletableFuture.completedFuture(defaultDatabase()),
                         mode,
                         Collections.emptySet(),
@@ -183,7 +183,7 @@ class RoutingTableRegistryImplTest {
         // Then
         verify(handler)
                 .ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         mode,
                         Collections.emptySet(),
                         authStageSupplier,

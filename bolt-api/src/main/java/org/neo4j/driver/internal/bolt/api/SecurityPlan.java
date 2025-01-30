@@ -22,7 +22,6 @@ import javax.net.ssl.SSLContext;
  * A SecurityPlan consists of encryption and trust details.
  */
 public interface SecurityPlan {
-    SecurityPlan INSECURE = new SecurityPlanImpl(false, false, null, false);
 
     @SuppressWarnings("SameReturnValue")
     boolean requiresEncryption();

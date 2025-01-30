@@ -18,16 +18,15 @@ package org.neo4j.driver.testutil;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.neo4j.driver.internal.util.CertificateTool.saveX509Cert;
+import static org.neo4j.driver.testutil.CertificateTool.saveX509Cert;
 
 import java.io.File;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
-import org.neo4j.driver.internal.util.CertificateTool;
 
-public class CertificateUtilTest {
+class CertificateUtilTest {
     @Test
     void shouldLoadMultipleCertsIntoKeyStore() throws Throwable {
         // Given

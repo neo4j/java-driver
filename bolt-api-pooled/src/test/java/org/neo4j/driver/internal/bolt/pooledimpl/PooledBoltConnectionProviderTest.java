@@ -65,6 +65,7 @@ import org.neo4j.driver.internal.bolt.api.NotificationConfig;
 import org.neo4j.driver.internal.bolt.api.ResponseHandler;
 import org.neo4j.driver.internal.bolt.api.RoutingContext;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.SecurityPlans;
 import org.neo4j.driver.internal.bolt.api.exception.MinVersionAcquisitionException;
 import org.neo4j.driver.internal.bolt.api.summary.ResetSummary;
 import org.neo4j.driver.internal.bolt.api.values.Value;
@@ -104,7 +105,7 @@ class PooledBoltConnectionProviderTest {
     final String userAgent = "agent";
     final int timeout = 1000;
 
-    final SecurityPlan securityPlan = SecurityPlan.INSECURE;
+    final SecurityPlan securityPlan = SecurityPlans.unencrypted();
     final DatabaseName databaseName = DatabaseNameUtil.defaultDatabase();
     final AccessMode mode = AccessMode.WRITE;
     final Set<String> bookmarks = Set.of("bookmark1", "bookmark2");
@@ -512,7 +513,7 @@ class PooledBoltConnectionProviderTest {
                         boltAgent,
                         userAgent,
                         timeout,
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
@@ -577,7 +578,7 @@ class PooledBoltConnectionProviderTest {
                         boltAgent,
                         userAgent,
                         timeout,
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();
@@ -649,7 +650,7 @@ class PooledBoltConnectionProviderTest {
                         boltAgent,
                         userAgent,
                         timeout,
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         AuthTokens.custom(Collections.emptyMap()))
                 .toCompletableFuture()
                 .join();

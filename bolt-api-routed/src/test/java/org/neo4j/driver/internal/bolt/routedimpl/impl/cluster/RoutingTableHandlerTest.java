@@ -66,6 +66,7 @@ import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.ClusterComposition;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
 import org.neo4j.driver.internal.bolt.api.SecurityPlan;
+import org.neo4j.driver.internal.bolt.api.SecurityPlans;
 import org.neo4j.driver.internal.bolt.api.exception.BoltServiceUnavailableException;
 import org.neo4j.driver.internal.bolt.routedimpl.ClusterCompositionLookupResult;
 import org.neo4j.driver.internal.bolt.routedimpl.Rediscovery;
@@ -120,7 +121,7 @@ class RoutingTableHandlerTest {
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionPool);
         assertNotNull(handler.ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         READ,
                         Collections.emptySet(),
                         () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
@@ -209,7 +210,7 @@ class RoutingTableHandlerTest {
                 newRoutingTableHandler(routingTable, rediscovery, connectionPool, registry, addressesToRetainRef::set);
 
         var actual = handler.ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         READ,
                         Collections.emptySet(),
                         () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
@@ -236,7 +237,7 @@ class RoutingTableHandlerTest {
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionPool, registry);
         assertThrows(RuntimeException.class, () -> handler.ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         READ,
                         Collections.emptySet(),
                         () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
@@ -277,7 +278,7 @@ class RoutingTableHandlerTest {
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionProviderGetter);
         var actual = handler.ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         mode,
                         Collections.emptySet(),
                         () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
@@ -322,7 +323,7 @@ class RoutingTableHandlerTest {
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionProviderGetter);
 
         assertNotNull(handler.ensureRoutingTable(
-                        SecurityPlan.INSECURE,
+                        SecurityPlans.unencrypted(),
                         notStaleMode,
                         Collections.emptySet(),
                         () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),

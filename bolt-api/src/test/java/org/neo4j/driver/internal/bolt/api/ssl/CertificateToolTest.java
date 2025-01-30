@@ -14,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.driver.testutil;
+package org.neo4j.driver.internal.bolt.api.ssl;
 
-import static org.neo4j.driver.testutil.CertificateTool.saveX509Cert;
-import static org.neo4j.driver.testutil.FileTools.tempFile;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -26,19 +27,21 @@ import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
-import javax.security.auth.x500.X500Principal;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
@@ -52,21 +55,49 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
-import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
-import org.neo4j.driver.internal.InternalPair;
-import org.neo4j.driver.util.Pair;
+import org.junit.jupiter.api.Test;
 
-public class CertificateUtil {
+class CertificateToolTest {
     private static final String DEFAULT_HOST_NAME = "localhost";
     private static final String DEFAULT_ENCRYPTION = "RSA";
     private static final Provider PROVIDER = new BouncyCastleProvider();
+    private static final String BEGIN_CERT = "-----BEGIN CERTIFICATE-----";
+    private static final String END_CERT = "-----END CERTIFICATE-----";
 
     static {
         // adds the Bouncy castle provider to java security
         Security.addProvider(PROVIDER);
+    }
+
+    @Test
+    void shouldLoadMultipleCertsIntoKeyStore() throws Throwable {
+        // Given
+        var certFile = File.createTempFile("3random", ".cer");
+        certFile.deleteOnExit();
+
+        var cert1 = generateSelfSignedCertificate();
+        var cert2 = generateSelfSignedCertificate();
+        var cert3 = generateSelfSignedCertificate();
+
+        saveX509Cert(new Certificate[] {cert1, cert2, cert3}, certFile);
+
+        var keyStore = KeyStore.getInstance("JKS");
+        keyStore.load(null, null);
+
+        // When
+        CertificateTool.loadX509Cert(Collections.singletonList(certFile), keyStore);
+
+        // Then
+        var aliases = keyStore.aliases();
+        assertTrue(aliases.hasMoreElements());
+        assertTrue(aliases.nextElement().startsWith("neo4j.javadriver.trustedcert"));
+        assertTrue(aliases.hasMoreElements());
+        assertTrue(aliases.nextElement().startsWith("neo4j.javadriver.trustedcert"));
+        assertTrue(aliases.hasMoreElements());
+        assertTrue(aliases.nextElement().startsWith("neo4j.javadriver.trustedcert"));
+        assertFalse(aliases.hasMoreElements());
     }
 
     private static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
@@ -102,7 +133,45 @@ public class CertificateUtil {
         return certificate;
     }
 
-    public static class SelfSignedCertificateGenerator {
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    private static void writePem(String type, byte[] encodedContent, File path) throws IOException {
+        if (path.getParentFile() != null && path.getParentFile().exists()) {
+            path.getParentFile().mkdirs();
+        }
+        try (var writer = new PemWriter(new FileWriter(path))) {
+            writer.writeObject(new PemObject(type, encodedContent));
+            writer.flush();
+        }
+    }
+
+    private static void saveX509Cert(Certificate cert, File certFile) throws GeneralSecurityException, IOException {
+        saveX509Cert(new Certificate[] {cert}, certFile);
+    }
+
+    private static void saveX509Cert(Certificate[] certs, File certFile) throws GeneralSecurityException, IOException {
+        try (var writer = new BufferedWriter(new FileWriter(certFile))) {
+            for (var cert : certs) {
+                var certStr =
+                        Base64.getEncoder().encodeToString(cert.getEncoded()).replaceAll("(.{64})", "$1\n");
+
+                writer.write(BEGIN_CERT);
+                writer.newLine();
+
+                writer.write(certStr);
+                writer.newLine();
+
+                writer.write(END_CERT);
+                writer.newLine();
+            }
+        }
+    }
+
+    private static X509Certificate generateSelfSignedCertificate()
+            throws GeneralSecurityException, OperatorCreationException, CertIOException {
+        return new SelfSignedCertificateGenerator().certificate;
+    }
+
+    private static class SelfSignedCertificateGenerator {
         private final KeyPair keyPair;
         private final X509Certificate certificate;
 
@@ -137,130 +206,6 @@ public class CertificateUtil {
                     keyPair,
                     csrPublicKey,
                     generalNames);
-        }
-    }
-
-    public static class CertificateSigningRequestGenerator {
-        // ref: http://senthadev.com/generating-csr-using-java-and-bouncycastle-api.html
-        private final KeyPair keyPair;
-        private final PKCS10CertificationRequest csr;
-
-        public CertificateSigningRequestGenerator() throws NoSuchAlgorithmException, OperatorCreationException {
-            var gen = KeyPairGenerator.getInstance(DEFAULT_ENCRYPTION);
-            gen.initialize(2048, new SecureRandom());
-            keyPair = gen.generateKeyPair();
-
-            var subject = new X500Principal("CN=" + DEFAULT_HOST_NAME);
-            var signGen = new JcaContentSignerBuilder("SHA512WithRSAEncryption").build(keyPair.getPrivate());
-
-            PKCS10CertificationRequestBuilder builder =
-                    new JcaPKCS10CertificationRequestBuilder(subject, keyPair.getPublic());
-            csr = builder.build(signGen);
-        }
-
-        public PublicKey publicKey() {
-            return keyPair.getPublic();
-        }
-
-        public PKCS10CertificationRequest certificateSigningRequest() {
-            return csr;
-        }
-
-        public void savePrivateKey(File saveTo) throws IOException {
-            writePem("PRIVATE KEY", keyPair.getPrivate().getEncoded(), saveTo);
-        }
-    }
-
-    /**
-     * Create a random certificate
-     *
-     * @return a random certificate
-     * @throws GeneralSecurityException, OperatorCreationException
-     */
-    public static X509Certificate generateSelfSignedCertificate()
-            throws GeneralSecurityException, OperatorCreationException, CertIOException {
-        return new SelfSignedCertificateGenerator().certificate;
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    private static void writePem(String type, byte[] encodedContent, File path) throws IOException {
-        if (path.getParentFile() != null && path.getParentFile().exists()) {
-            path.getParentFile().mkdirs();
-        }
-        try (var writer = new PemWriter(new FileWriter(path))) {
-            writer.writeObject(new PemObject(type, encodedContent));
-            writer.flush();
-        }
-    }
-
-    public static CertificateKeyPair<File, File> createNewCertificateAndKeySignedBy(
-            CertificateKeyPair<File, File> root, GeneralName... generalNames) throws Throwable {
-        Objects.requireNonNull(root.certGenerator);
-        var cert = tempFile("driver", ".cert");
-        var key = tempFile("driver", ".key");
-        var csrGenerator = new CertificateUtil.CertificateSigningRequestGenerator();
-        var signedCert = root.certGenerator.sign(
-                csrGenerator.certificateSigningRequest(), csrGenerator.publicKey(), generalNames);
-        csrGenerator.savePrivateKey(key);
-        saveX509Cert(signedCert, cert);
-
-        return new CertificateKeyPair<>(cert, key);
-    }
-
-    public static CertificateKeyPair<File, File> createNewCertificateAndKey(GeneralName... ipAddresses)
-            throws Throwable {
-        var cert = tempFile("driver", ".cert");
-        var key = tempFile("driver", ".key");
-        var certGenerator = new CertificateUtil.SelfSignedCertificateGenerator(ipAddresses);
-        certGenerator.saveSelfSignedCertificate(cert);
-        certGenerator.savePrivateKey(key);
-
-        return new CertificateKeyPair<>(cert, key, certGenerator);
-    }
-
-    public static class CertificateKeyPair<C, K> {
-        private final Pair<C, K> pair;
-        private final CertificateUtil.SelfSignedCertificateGenerator certGenerator;
-
-        public CertificateKeyPair(C cert, K key) {
-            this(cert, key, null);
-        }
-
-        public CertificateKeyPair(C cert, K key, CertificateUtil.SelfSignedCertificateGenerator certGenerator) {
-            this.pair = InternalPair.of(cert, key);
-            this.certGenerator = certGenerator;
-        }
-
-        public K key() {
-            return pair.value();
-        }
-
-        public C cert() {
-            return pair.key();
-        }
-
-        @Override
-        public String toString() {
-            return pair.toString();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-
-            var that = (CertificateKeyPair<?, ?>) o;
-
-            return pair.equals(that.pair);
-        }
-
-        @Override
-        public int hashCode() {
-            return pair.hashCode();
         }
     }
 }

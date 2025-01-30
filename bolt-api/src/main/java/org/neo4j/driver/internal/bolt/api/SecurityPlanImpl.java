@@ -21,7 +21,7 @@ import javax.net.ssl.SSLContext;
 /**
  * A SecurityPlan consists of encryption and trust details.
  */
-public record SecurityPlanImpl(
+record SecurityPlanImpl(
         boolean requiresEncryption,
         boolean requiresClientAuth,
         SSLContext sslContext,
