@@ -57,10 +57,25 @@ import org.neo4j.driver.internal.bolt.basicimpl.impl.async.outbound.OutboundMess
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.MessageFormat;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v3.MessageFormatV3;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v4.BoltProtocolV4;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v4.MessageFormatV4;
-import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v41.BoltProtocolV41;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v42.BoltProtocolV42;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v43.BoltProtocolV43;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v43.MessageFormatV43;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v44.BoltProtocolV44;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v44.MessageFormatV44;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v5.BoltProtocolV5;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v5.MessageFormatV5;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v51.BoltProtocolV51;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v51.MessageFormatV51;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v52.BoltProtocolV52;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v53.BoltProtocolV53;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v54.BoltProtocolV54;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v54.MessageFormatV54;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v55.BoltProtocolV55;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v56.BoltProtocolV56;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v57.BoltProtocolV57;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v57.MessageFormatV57;
+import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.v58.BoltProtocolV58;
 
 class HandshakeHandlerTest {
     private final EmbeddedChannel channel = new EmbeddedChannel();
@@ -265,9 +280,18 @@ class HandshakeHandlerTest {
     private static Stream<Arguments> protocolVersions() {
         return Stream.of(
                 arguments(BoltProtocolV3.VERSION, MessageFormatV3.class),
-                arguments(BoltProtocolV4.VERSION, MessageFormatV4.class),
-                arguments(BoltProtocolV41.VERSION, MessageFormatV4.class),
-                arguments(BoltProtocolV42.VERSION, MessageFormatV4.class));
+                arguments(BoltProtocolV42.VERSION, MessageFormatV4.class),
+                arguments(BoltProtocolV43.VERSION, MessageFormatV43.class),
+                arguments(BoltProtocolV44.VERSION, MessageFormatV44.class),
+                arguments(BoltProtocolV5.VERSION, MessageFormatV5.class),
+                arguments(BoltProtocolV51.VERSION, MessageFormatV51.class),
+                arguments(BoltProtocolV52.VERSION, MessageFormatV51.class),
+                arguments(BoltProtocolV53.VERSION, MessageFormatV51.class),
+                arguments(BoltProtocolV54.VERSION, MessageFormatV54.class),
+                arguments(BoltProtocolV55.VERSION, MessageFormatV54.class),
+                arguments(BoltProtocolV56.VERSION, MessageFormatV54.class),
+                arguments(BoltProtocolV57.VERSION, MessageFormatV57.class),
+                arguments(BoltProtocolV58.VERSION, MessageFormatV57.class));
     }
 
     private static HandshakeHandler newHandler(CompletableFuture<Channel> handshakeCompletedFuture) {
