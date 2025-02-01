@@ -19,6 +19,7 @@ package org.neo4j.driver.internal.boltlistener;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.internal.bolt.api.AccessMode;
@@ -169,6 +170,11 @@ final class ListeningBoltConnection implements BoltConnection {
     }
 
     @Override
+    public CompletionStage<Void> setReadTimeout(Duration duration) {
+        return delegate.setReadTimeout(duration);
+    }
+
+    @Override
     public BoltConnectionState state() {
         return delegate.state();
     }
@@ -201,5 +207,10 @@ final class ListeningBoltConnection implements BoltConnection {
     @Override
     public boolean serverSideRoutingEnabled() {
         return delegate.serverSideRoutingEnabled();
+    }
+
+    @Override
+    public Optional<Duration> defaultReadTimeout() {
+        return delegate.defaultReadTimeout();
     }
 }

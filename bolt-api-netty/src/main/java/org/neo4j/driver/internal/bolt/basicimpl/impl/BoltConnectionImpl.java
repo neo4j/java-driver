@@ -488,6 +488,11 @@ public final class BoltConnectionImpl implements BoltConnection {
     }
 
     @Override
+    public CompletionStage<Void> setReadTimeout(Duration duration) {
+        return executeInEventLoop(() -> connection.setReadTimeout(duration));
+    }
+
+    @Override
     public BoltConnectionState state() {
         var state = stateRef.get();
         if (state == BoltConnectionState.OPEN) {
@@ -526,6 +531,11 @@ public final class BoltConnectionImpl implements BoltConnection {
     @Override
     public boolean serverSideRoutingEnabled() {
         return serverSideRouting;
+    }
+
+    @Override
+    public Optional<Duration> defaultReadTimeout() {
+        return connection.defaultReadTimeoutMillis();
     }
 
     private CompletionStage<Void> executeInEventLoop(Runnable runnable) {

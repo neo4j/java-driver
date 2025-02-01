@@ -23,7 +23,9 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.EventLoop;
+import java.time.Duration;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -56,7 +58,8 @@ public class NetworkConnection implements Connection {
     private final boolean ssrEnabled;
     private final BoltProtocol protocol;
 
-    private final Long connectionReadTimeout;
+    private final Duration defaultReadTimeout;
+    private Duration readTimeout;
 
     private ChannelHandler connectionReadTimeoutHandler;
 
@@ -70,8 +73,10 @@ public class NetworkConnection implements Connection {
         this.telemetryEnabled = ChannelAttributes.telemetryEnabled(channel);
         this.ssrEnabled = ChannelAttributes.ssrEnabled(channel);
         this.protocol = BoltProtocol.forChannel(channel);
-        this.connectionReadTimeout =
-                ChannelAttributes.connectionReadTimeout(channel).orElse(null);
+        this.defaultReadTimeout = ChannelAttributes.connectionReadTimeout(channel)
+                .map(Duration::ofSeconds)
+                .orElse(null);
+        this.readTimeout = defaultReadTimeout;
     }
 
     @Override
@@ -179,6 +184,25 @@ public class NetworkConnection implements Connection {
         return channel.eventLoop();
     }
 
+    @Override
+    public Optional<Duration> defaultReadTimeoutMillis() {
+        return Optional.ofNullable(defaultReadTimeout);
+    }
+
+    @Override
+    public void setReadTimeout(Duration duration) {
+        if (!channel.eventLoop().inEventLoop()) {
+            throw new IllegalStateException("This method may only be called in the EventLoop");
+        }
+
+        if (duration != null && duration.toMillis() > 0) {
+            // only values greater than zero milliseconds are supported
+            this.readTimeout = duration;
+        } else {
+            this.readTimeout = this.defaultReadTimeout;
+        }
+    }
+
     private CompletionStage<Void> writeMessageInEventLoop(Message message, ResponseHandler handler) {
         var future = new CompletableFuture<Void>();
         Runnable runnable = () -> {
@@ -215,8 +239,9 @@ public class NetworkConnection implements Connection {
             throw new IllegalStateException("This method may only be called in the EventLoop");
         }
 
-        if (connectionReadTimeout != null && connectionReadTimeoutHandler == null) {
-            connectionReadTimeoutHandler = new ConnectionReadTimeoutHandler(connectionReadTimeout, TimeUnit.SECONDS);
+        if (this.readTimeout != null && connectionReadTimeoutHandler == null) {
+            connectionReadTimeoutHandler =
+                    new ConnectionReadTimeoutHandler(readTimeout.toMillis(), TimeUnit.MILLISECONDS);
             channel.pipeline().addFirst(connectionReadTimeoutHandler);
             log.log(System.Logger.Level.DEBUG, "Added ConnectionReadTimeoutHandler");
             messageDispatcher.setBeforeLastHandlerHook(() -> {
