@@ -19,6 +19,7 @@ package org.neo4j.driver.internal.bolt.pooledimpl.impl;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -317,6 +318,11 @@ public class PooledBoltConnection implements BoltConnection {
     }
 
     @Override
+    public CompletionStage<Void> setReadTimeout(Duration duration) {
+        return delegate.setReadTimeout(duration);
+    }
+
+    @Override
     public BoltConnectionState state() {
         return delegate.state();
     }
@@ -349,6 +355,11 @@ public class PooledBoltConnection implements BoltConnection {
     @Override
     public boolean serverSideRoutingEnabled() {
         return delegate.serverSideRoutingEnabled();
+    }
+
+    @Override
+    public Optional<Duration> defaultReadTimeout() {
+        return delegate.defaultReadTimeout();
     }
 
     // internal use only

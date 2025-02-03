@@ -18,6 +18,7 @@ package org.neo4j.driver.internal.bolt.api;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.internal.bolt.api.values.Value;
@@ -75,6 +76,10 @@ public interface BoltConnection {
 
     CompletionStage<Void> close();
 
+    // ----- STATE UPDATES -----
+
+    CompletionStage<Void> setReadTimeout(Duration duration);
+
     // ----- MUTABLE DATA -----
 
     BoltConnectionState state();
@@ -92,4 +97,6 @@ public interface BoltConnection {
     boolean telemetrySupported();
 
     boolean serverSideRoutingEnabled();
+
+    Optional<Duration> defaultReadTimeout();
 }

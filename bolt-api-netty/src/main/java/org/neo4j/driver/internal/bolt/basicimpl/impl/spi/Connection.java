@@ -17,6 +17,8 @@
 package org.neo4j.driver.internal.bolt.basicimpl.impl.spi;
 
 import io.netty.channel.EventLoop;
+import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.basicimpl.impl.messaging.BoltProtocol;
@@ -48,4 +50,8 @@ public interface Connection {
     CompletionStage<Void> close();
 
     EventLoop eventLoop();
+
+    Optional<Duration> defaultReadTimeoutMillis();
+
+    void setReadTimeout(Duration duration);
 }
