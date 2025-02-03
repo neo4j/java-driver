@@ -170,7 +170,7 @@ public class DriverFactory {
         try {
             var homeDatabaseCache =
                     HomeDatabaseCache.newInstance(uri.getScheme().startsWith("neo4j"));
-            boltConnectionProvider = createBoltConnectionProvider(
+            boltConnectionProvider = createDriverBoltConnectionProvider(
                     uri,
                     config,
                     eventLoopGroup,
@@ -223,7 +223,7 @@ public class DriverFactory {
                         .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private DriverBoltConnectionProvider createBoltConnectionProvider(
+    private DriverBoltConnectionProvider createDriverBoltConnectionProvider(
             URI uri,
             Config config,
             EventLoopGroup eventLoopGroup,
@@ -236,8 +236,48 @@ public class DriverFactory {
             String userAgent,
             int connectTimeoutMillis,
             MetricsListener metricsListener) {
-        DriverBoltConnectionProvider boltConnectionProvider;
         var clock = createClock();
+        var boltConnectionProvider = createBoltConnectionProvider(
+                uri,
+                config,
+                eventLoopGroup,
+                routingSettings,
+                rediscoverySupplier,
+                boltConnectionListener,
+                address,
+                routingContext,
+                boltAgent,
+                userAgent,
+                connectTimeoutMillis,
+                metricsListener,
+                clock);
+        return new AdaptingDriverBoltConnectionProvider(
+                boltConnectionProvider,
+                ErrorMapper.getInstance(),
+                BoltValueFactory.getInstance(),
+                uri.getScheme().startsWith("neo4j"),
+                address,
+                routingContext,
+                boltAgent,
+                userAgent,
+                connectTimeoutMillis);
+    }
+
+    protected BoltConnectionProvider createBoltConnectionProvider(
+            URI uri,
+            Config config,
+            EventLoopGroup eventLoopGroup,
+            RoutingSettings routingSettings,
+            Supplier<Rediscovery> rediscoverySupplier,
+            BoltConnectionListener boltConnectionListener,
+            BoltServerAddress address,
+            RoutingContext routingContext,
+            BoltAgent boltAgent,
+            String userAgent,
+            int connectTimeoutMillis,
+            MetricsListener metricsListener,
+            Clock clock) {
+        BoltConnectionProvider boltConnectionProvider;
         var loggingProvider = new BoltLoggingProvider(config.logging());
         Function<BoltServerAddress, BoltConnectionProvider> pooledBoltConnectionProviderSupplier =
                 selectedAddress -> createPooledBoltConnectionProvider(
@@ -252,42 +292,23 @@ public class DriverFactory {
                         userAgent,
                         connectTimeoutMillis,
                         metricsListener);
-        var errorMapper = ErrorMapper.getInstance();
-        if (uri.getScheme().startsWith("bolt")) {
-            assertNoRoutingContext(uri, routingSettings);
-            boltConnectionProvider = new AdaptingDriverBoltConnectionProvider(
-                    pooledBoltConnectionProviderSupplier.apply(address),
-                    errorMapper,
-                    BoltValueFactory.getInstance(),
-                    false,
+        if (uri.getScheme().startsWith("neo4j")) {
+            boltConnectionProvider = createRoutedBoltConnectionProvider(
+                    config,
+                    pooledBoltConnectionProviderSupplier,
+                    routingSettings,
+                    rediscoverySupplier,
+                    clock,
+                    loggingProvider,
                     address,
                     routingContext,
                     boltAgent,
                     userAgent,
-                    connectTimeoutMillis);
+                    connectTimeoutMillis,
+                    metricsListener);
         } else {
-            boltConnectionProvider = new AdaptingDriverBoltConnectionProvider(
-                    createRoutedBoltConnectionProvider(
-                            config,
-                            pooledBoltConnectionProviderSupplier,
-                            routingSettings,
-                            rediscoverySupplier,
-                            clock,
-                            loggingProvider,
-                            address,
-                            routingContext,
-                            boltAgent,
-                            userAgent,
-                            connectTimeoutMillis,
-                            metricsListener),
-                    errorMapper,
-                    BoltValueFactory.getInstance(),
-                    true,
-                    address,
-                    routingContext,
-                    boltAgent,
-                    userAgent,
-                    connectTimeoutMillis);
+            assertNoRoutingContext(uri, routingSettings);
+            boltConnectionProvider = pooledBoltConnectionProviderSupplier.apply(address);
         }
         return boltConnectionProvider;
     }
