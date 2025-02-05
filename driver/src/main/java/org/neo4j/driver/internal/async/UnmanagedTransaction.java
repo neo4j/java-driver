@@ -233,7 +233,14 @@ public class UnmanagedTransaction implements TerminationAwareStateLockingExecuto
         ensureCanRunQueries();
         var parameters = query.parameters().asMap(Values::value);
         var resultCursor = new ResultCursorImpl(
-                connection, query, fetchSize, (bookmark) -> {}, false, beginFuture, ignored -> {}, apiTelemetryWork);
+                connection,
+                query,
+                fetchSize,
+                (bookmark) -> {},
+                false,
+                beginFuture,
+                databaseNameConsumer,
+                apiTelemetryWork);
         var flushStage = connection
                 .run(query.text(), parameters)
                 .thenCompose(ignored -> connection.pull(-1, fetchSize))
