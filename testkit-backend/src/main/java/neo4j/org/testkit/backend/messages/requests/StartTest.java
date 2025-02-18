@@ -89,6 +89,9 @@ public class StartTest implements TestkitRequest {
         COMMON_SKIP_PATTERN_TO_REASON.put(
                 "^stub\\.routing\\.test_routing_v[^.]*\\.RoutingV[^.]*\\.test_ipv6_read",
                 "Needs trying all DNS resolved addresses for hosts in the routing table");
+        COMMON_SKIP_PATTERN_TO_REASON.put(
+                "^stub\\.summary\\.test_summary\\.TestSummaryBasicInfoDiscard\\.test_times$",
+                "Driver sets summary's resultAvailableAfter to -1 on discard");
 
         SYNC_SKIP_PATTERN_TO_REASON.putAll(COMMON_SKIP_PATTERN_TO_REASON);
         skipMessage =
