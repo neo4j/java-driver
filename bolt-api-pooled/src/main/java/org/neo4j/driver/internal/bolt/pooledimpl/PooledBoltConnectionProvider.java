@@ -45,6 +45,7 @@ import org.neo4j.driver.internal.bolt.api.BoltConnectionState;
 import org.neo4j.driver.internal.bolt.api.BoltProtocolVersion;
 import org.neo4j.driver.internal.bolt.api.BoltServerAddress;
 import org.neo4j.driver.internal.bolt.api.DatabaseName;
+import org.neo4j.driver.internal.bolt.api.ListenerEvent;
 import org.neo4j.driver.internal.bolt.api.LoggingProvider;
 import org.neo4j.driver.internal.bolt.api.MetricsListener;
 import org.neo4j.driver.internal.bolt.api.NotificationConfig;
@@ -158,8 +159,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 return;
             }
 
-            var beforeAcquiringOrCreatingEvent = metricsListener.createListenerEvent();
-            metricsListener.beforeAcquiringOrCreating(poolId, beforeAcquiringOrCreatingEvent);
+            var acquireEvent = metricsListener.createListenerEvent();
+            metricsListener.beforeAcquiringOrCreating(poolId, acquireEvent);
             acquisitionFuture.whenComplete((connection, throwable) -> {
                 throwable = FutureUtil.completionExceptionCause(throwable);
                 if (throwable != null) {
@@ -167,7 +168,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                         metricsListener.afterTimedOutToAcquireOrCreate(poolId);
                     }
                 } else {
-                    metricsListener.afterAcquiredOrCreated(poolId, beforeAcquiringOrCreatingEvent);
+                    metricsListener.afterAcquiredOrCreated(poolId, acquireEvent);
                 }
                 metricsListener.afterAcquiringOrCreating(poolId);
             });
@@ -312,24 +313,28 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                     purge(entry);
                                     metricsListener.afterConnectionReleased(poolId, inUseEvent);
                                 });
-                        reauthStage(entryWithMetadata, authToken).whenComplete((ignored2, throwable2) -> {
-                            if (!acquisitionFuture.complete(pooledConnection)) {
-                                // acquisition timed out
-                                CompletableFuture<PooledBoltConnection> pendingAcquisition;
-                                synchronized (this) {
-                                    pendingAcquisition = pendingAcquisitions.poll();
-                                    if (pendingAcquisition == null) {
-                                        // nothing pending, just make the entry available
-                                        entry.available = true;
-                                    }
-                                }
-                                if (pendingAcquisition != null) {
-                                    if (pendingAcquisition.complete(pooledConnection)) {
-                                        metricsListener.afterConnectionCreated(poolId, inUseEvent);
-                                    }
-                                }
+                        reauthStage(entryWithMetadata, authToken).whenComplete((ignored2, reauthThrowable) -> {
+                            if (reauthThrowable != null) {
+                                // reauth pipelining failed, purge the connection and try again
+                                purge(entry);
+                                connect(
+                                        acquisitionFuture,
+                                        securityPlan,
+                                        databaseName,
+                                        authToken,
+                                        authTokenStageSupplier,
+                                        mode,
+                                        bookmarks,
+                                        impersonatedUser,
+                                        minVersion,
+                                        notificationConfig);
                             } else {
-                                metricsListener.afterConnectionCreated(poolId, inUseEvent);
+                                if (!acquisitionFuture.complete(pooledConnection)) {
+                                    // acquisition timed out
+                                    findAndCompletePendingAcquisition(entry, pooledConnection, inUseEvent);
+                                } else {
+                                    metricsListener.afterConnectionCreated(poolId, inUseEvent);
+                                }
                             }
                         });
                     }
@@ -408,6 +413,25 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
         }
     }
 
+    private void findAndCompletePendingAcquisition(
+            ConnectionEntry entry, PooledBoltConnection pooledConnection, ListenerEvent<?> inUseEvent) {
+        CompletableFuture<PooledBoltConnection> pendingAcquisition;
+        synchronized (this) {
+            pendingAcquisition = pendingAcquisitions.poll();
+            if (pendingAcquisition == null) {
+                // nothing pending, just make the entry available
+                entry.available = true;
+            }
+        }
+        if (pendingAcquisition != null) {
+            if (pendingAcquisition.complete(pooledConnection)) {
+                metricsListener.afterConnectionCreated(poolId, inUseEvent);
+            } else {
+                findAndCompletePendingAcquisition(entry, pooledConnection, inUseEvent);
+            }
+        }
+    }
+
     private synchronized ConnectionEntryWithMetadata acquireExistingEntry(
             AuthToken authToken, BoltProtocolVersion minVersion) {
         ConnectionEntryWithMetadata connectionEntryWithMetadata = null;
@@ -425,6 +449,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
             if (connection.state() != BoltConnectionState.OPEN) {
                 connection.close();
                 iterator.remove();
+                metricsListener.afterClosed(poolId);
                 continue;
             }
 
@@ -463,6 +488,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                                     throwable.getClass().getCanonicalName());
                         }
                     });
+                    metricsListener.afterClosed(poolId);
                     continue;
                 }
             }
@@ -483,15 +509,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                     .connection
                     .logoff()
                     .thenCompose(conn -> conn.logon(authToken))
-                    .handle((ignored, throwable) -> {
-                        if (throwable != null) {
-                            connectionEntryWithMetadata.connectionEntry.connection.close();
-                            synchronized (this) {
-                                pooledConnectionEntries.remove(connectionEntryWithMetadata.connectionEntry);
-                            }
-                        }
-                        return null;
-                    });
+                    .thenApply(ignored -> null);
         } else {
             stage = CompletableFuture.completedStage(null);
         }
@@ -612,9 +630,12 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 var iterator = pooledConnectionEntries.iterator();
                 while (iterator.hasNext()) {
                     var entry = iterator.next();
-                    if (entry.connection != null && entry.connection.state() == BoltConnectionState.OPEN) {
+                    if (entry.connection != null) {
                         this.closeStage = this.closeStage.thenCompose(
-                                ignored -> entry.connection.close().exceptionally(throwable -> null));
+                                ignored -> entry.connection.close().handle((ignored1, ignored2) -> {
+                                    metricsListener.afterClosed(poolId);
+                                    return null;
+                                }));
                     }
                     iterator.remove();
                 }
@@ -677,8 +698,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
         synchronized (this) {
             pooledConnectionEntries.remove(entry);
         }
-        metricsListener.afterClosed(poolId);
         entry.connection.close();
+        metricsListener.afterClosed(poolId);
         log.log(System.Logger.Level.DEBUG, "Connection purged from the pool.");
     }
 
